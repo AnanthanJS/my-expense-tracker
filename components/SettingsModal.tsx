@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { COLORS, FONTS } from '../constants/theme';
-import { Settings } from '../utils/storage';
+import { IconX } from '@tabler/icons-react-native';
+import { FONTS } from '../constants/theme';
+import type { Settings } from '../utils/storage';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -24,11 +26,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onSave,
 }) => {
+  const { colors } = useAppTheme();
   const [income, setIncome] = useState(settings.income);
   const [budget, setBudget] = useState(settings.budget);
   const [currency, setCurrency] = useState(settings.currency);
 
-  // Sync local state whenever the modal becomes visible or settings change
   useEffect(() => {
     if (visible) {
       setIncome(settings.income);
@@ -38,7 +40,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [visible, settings]);
 
   const handleSave = () => {
-    onSave({ income, budget, currency });
+    onSave({ ...settings, income, budget, currency });
     onClose();
   };
 
@@ -50,53 +52,64 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>SETTINGS</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeText}>✕</Text>
+            <Text style={[styles.title, { color: colors.textMuted }]}>SETTINGS</Text>
+            <TouchableOpacity 
+              onPress={onClose}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              activeOpacity={0.7}
+              style={styles.closeBtn}
+              accessibilityLabel="Close settings"
+              accessibilityRole="button"
+            >
+              <IconX size={20} color={colors.textMuted} strokeWidth={2.5} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.form}>
             <View style={styles.field}>
-              <Text style={styles.label}>Monthly Income</Text>
+              <Text style={[styles.label, { color: colors.textMuted }]}>Monthly Income</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surfaceLight, color: colors.text }]}
                 value={income}
                 onChangeText={setIncome}
                 keyboardType="decimal-pad"
                 placeholder="5000"
-                placeholderTextColor={COLORS.textDim}
+                placeholderTextColor={colors.textDim}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Monthly Budget</Text>
+              <Text style={[styles.label, { color: colors.textMuted }]}>Monthly Budget</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surfaceLight, color: colors.text }]}
                 value={budget}
                 onChangeText={setBudget}
                 keyboardType="decimal-pad"
                 placeholder="2000"
-                placeholderTextColor={COLORS.textDim}
+                placeholderTextColor={colors.textDim}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Currency Symbol</Text>
+              <Text style={[styles.label, { color: colors.textMuted }]}>Currency Symbol</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surfaceLight, color: colors.text }]}
                 value={currency}
                 onChangeText={setCurrency}
                 maxLength={3}
                 placeholder="₹"
-                placeholderTextColor={COLORS.textDim}
+                placeholderTextColor={colors.textDim}
               />
             </View>
 
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>Save Settings</Text>
+            <TouchableOpacity 
+              style={[styles.saveButton, { backgroundColor: colors.primary }]} 
+              onPress={handleSave}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.saveButtonText, { color: colors.background }]}>Save Settings</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -108,16 +121,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
-    padding: 20,
+    padding: 24,
   },
   container: {
-    backgroundColor: COLORS.surface,
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: COLORS.surfaceLight,
   },
   header: {
     flexDirection: 'row',
@@ -126,10 +137,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    color: COLORS.textMuted,
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: FONTS.bold,
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   form: {
     gap: 20,
@@ -138,37 +148,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
-    color: COLORS.textMuted,
     fontSize: 14,
     fontFamily: FONTS.medium,
   },
   input: {
-    backgroundColor: COLORS.surfaceLight,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: Platform.OS === 'ios' ? 14 : 10,
-    color: COLORS.text,
     fontSize: 16,
     fontFamily: FONTS.regular,
+    minHeight: 48,
   },
   saveButton: {
-    backgroundColor: COLORS.primary,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 10,
+    minHeight: 56,
+    justifyContent: 'center',
   },
   saveButtonText: {
-    color: COLORS.background,
     fontSize: 16,
     fontFamily: FONTS.bold,
   },
-  closeText: {
-    color: COLORS.textMuted,
-    fontSize: 18,
-    fontFamily: FONTS.bold,
-    paddingHorizontal: 4,
+  closeBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
-export default SettingsModal;
+export default React.memo(SettingsModal);

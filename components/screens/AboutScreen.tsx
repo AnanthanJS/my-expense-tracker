@@ -4,10 +4,10 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  Linking,
-  TouchableOpacity,
 } from 'react-native';
-import { COLORS, FONTS } from '../../constants/theme';
+import appConfig from '../../app.json';
+import { FONTS, SPACING } from '../../constants/theme';
+import { useAppTheme } from '../../hooks/useAppTheme';
 
 const FEATURES = [
   { icon: '₹', title: 'Rupee-first', desc: 'Built for Indian users with ₹ as default currency.' },
@@ -19,35 +19,37 @@ const FEATURES = [
 ];
 
 const AboutScreen: React.FC = () => {
+  const { colors } = useAppTheme();
+
   return (
     <ScrollView
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
       {/* Hero */}
       <View style={styles.hero}>
-        <View style={styles.appIconWrap}>
+        <View style={[styles.appIconWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
           <Text style={styles.appIconEmoji}>💰</Text>
         </View>
-        <Text style={styles.appName}>My Expense Tracker</Text>
-        <Text style={styles.appVersion}>Version 1.0.0  •  Built with React Native</Text>
-        <Text style={styles.tagline}>
+        <Text style={[styles.appName, { color: colors.primary }]}>My Expense Tracker</Text>
+        <Text style={[styles.appVersion, { color: colors.textDim }]}>Version {appConfig.expo.version}  •  Built with React Native</Text>
+        <Text style={[styles.tagline, { color: colors.textMuted }]}>
           Your personal finance companion — simple, fast &amp; private.
         </Text>
       </View>
 
       {/* Features */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>FEATURES</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>FEATURES</Text>
         {FEATURES.map((f) => (
-          <View key={f.title} style={styles.featureRow}>
-            <View style={styles.featureIcon}>
+          <View key={f.title} style={[styles.featureRow, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
+            <View style={[styles.featureIcon, { backgroundColor: colors.surfaceLight }]}>
               <Text style={styles.featureIconText}>{f.icon}</Text>
             </View>
             <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureDesc}>{f.desc}</Text>
+              <Text style={[styles.featureTitle, { color: colors.text }]}>{f.title}</Text>
+              <Text style={[styles.featureDesc, { color: colors.textMuted }]}>{f.desc}</Text>
             </View>
           </View>
         ))}
@@ -55,9 +57,9 @@ const AboutScreen: React.FC = () => {
 
       {/* Privacy */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>PRIVACY</Text>
-        <View style={styles.card}>
-          <Text style={styles.privacyText}>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PRIVACY</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
+          <Text style={[styles.privacyText, { color: colors.textMuted }]}>
             🔒  All your data stays on this device. No accounts, no cloud, no tracking.
             Your financial data is completely private.
           </Text>
@@ -66,15 +68,15 @@ const AboutScreen: React.FC = () => {
 
       {/* Credits */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>BUILT WITH</Text>
-        <View style={styles.card}>
-          {['Expo & React Native', 'AsyncStorage', 'DM Sans (Google Fonts)', 'Lucide Icons'].map((tech) => (
-            <Text key={tech} style={styles.techItem}>• {tech}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>BUILT WITH</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
+          {['Expo & React Native', 'AsyncStorage', 'DM Sans (Google Fonts)', 'React Native Paper'].map((tech) => (
+            <Text key={tech} style={[styles.techItem, { color: colors.textMuted }]}>• {tech}</Text>
           ))}
         </View>
       </View>
 
-      <Text style={styles.footer}>Made with ❤️ for everyday budgeting</Text>
+      <Text style={[styles.footer, { color: colors.textDim }]}>Made with ❤️ for everyday budgeting</Text>
     </ScrollView>
   );
 };
@@ -82,7 +84,7 @@ const AboutScreen: React.FC = () => {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: {
-    padding: 20,
+    padding: SPACING.lg,
     paddingBottom: 120,
   },
   hero: {
@@ -94,35 +96,26 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 24,
-    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
     elevation: 8,
   },
   appIconEmoji: {
     fontSize: 38,
   },
   appName: {
-    color: COLORS.primary,
     fontSize: 24,
     fontFamily: FONTS.bold,
     marginBottom: 4,
   },
   appVersion: {
-    color: COLORS.textDim,
     fontSize: 12,
     fontFamily: FONTS.regular,
     marginBottom: 10,
   },
   tagline: {
-    color: COLORS.textMuted,
     fontSize: 14,
     fontFamily: FONTS.regular,
     textAlign: 'center',
@@ -132,7 +125,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    color: COLORS.textMuted,
     fontSize: 11,
     fontFamily: FONTS.bold,
     letterSpacing: 1.5,
@@ -142,57 +134,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 14,
-    backgroundColor: COLORS.surface,
     borderRadius: 14,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.surfaceLight,
   },
   featureIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: COLORS.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   featureIconText: { fontSize: 18 },
   featureText: { flex: 1 },
   featureTitle: {
-    color: COLORS.text,
     fontSize: 14,
     fontFamily: FONTS.bold,
     marginBottom: 2,
   },
   featureDesc: {
-    color: COLORS.textMuted,
     fontSize: 12,
     fontFamily: FONTS.regular,
     lineHeight: 18,
   },
   card: {
-    backgroundColor: COLORS.surface,
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.surfaceLight,
     gap: 6,
   },
   privacyText: {
-    color: COLORS.textMuted,
     fontSize: 13,
     fontFamily: FONTS.regular,
     lineHeight: 20,
   },
   techItem: {
-    color: COLORS.textMuted,
     fontSize: 13,
     fontFamily: FONTS.regular,
     lineHeight: 22,
   },
   footer: {
-    color: COLORS.textDim,
     fontSize: 12,
     fontFamily: FONTS.regular,
     textAlign: 'center',
@@ -201,4 +183,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AboutScreen;
+export default React.memo(AboutScreen);
