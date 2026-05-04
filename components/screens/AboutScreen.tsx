@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
+import appConfig from '../../app.json';
 import { FONTS, SPACING } from '../../constants/theme';
 import { useAppTheme } from '../../hooks/useAppTheme';
 
@@ -32,7 +33,7 @@ const AboutScreen: React.FC = () => {
           <Text style={styles.appIconEmoji}>💰</Text>
         </View>
         <Text style={[styles.appName, { color: colors.primary }]}>My Expense Tracker</Text>
-        <Text style={[styles.appVersion, { color: colors.textDim }]}>Version 1.0.0  •  Built with React Native</Text>
+        <Text style={[styles.appVersion, { color: colors.textDim }]}>Version {appConfig.expo.version}  •  Built with React Native</Text>
         <Text style={[styles.tagline, { color: colors.textMuted }]}>
           Your personal finance companion — simple, fast &amp; private.
         </Text>
