@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import type { DimensionValue } from 'react-native';
-import { 
-  IconChartBar, 
-  IconSwipe, 
-  IconPlus, 
+import {
+  IconChartBar,
+  IconSwipe,
+  IconPlus,
   IconArrowRight,
   IconCheck,
   IconFilter,
@@ -29,8 +29,8 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: 'Welcome to ZarcZ',
-    description: 'Track spending, budgets, savings, categories, and backups from one clean workspace.',
+    title: 'Welcome to Expense Tracker',
+    description: 'Track daily expenses, budgets, savings, categories, and backups from one clean workspace.',
     icon: IconChartBar,
   },
   {
@@ -108,7 +108,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete }
           </View>
 
           <View style={styles.footer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={onComplete}
               style={styles.skipBtn}
               accessibilityLabel="Skip guide"
@@ -117,7 +117,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete }
               <Text style={[styles.skipText, { color: colors.textDim }]}>Skip</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleNext}
               style={[styles.nextBtn, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
