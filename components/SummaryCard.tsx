@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, FONTS } from '../constants/theme';
+import { FONTS, SPACING } from '../constants/theme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import ProgressCircle from './ProgressCircle';
 
 interface SummaryCardProps {
@@ -14,40 +15,50 @@ interface SummaryCardProps {
 const SummaryCard: React.FC<SummaryCardProps> = ({
   spent,
   budget,
-  income,
   currency,
   month,
 }) => {
-  const percentage = (spent / budget) * 100;
-  const remaining = Math.max(budget - spent, 0);
-  const savings = Math.max(income - spent, 0);
+  const { colors } = useAppTheme();
+  const percentage  = useMemo(() => (spent / budget) * 100, [spent, budget]);
+  const remaining   = useMemo(() => Math.max(budget - spent, 0), [budget, spent]);
+  const isOver      = spent > budget;
+  const statusColor = useMemo(() => isOver ? colors.danger : colors.accent, [isOver, colors]);
 
-  const getRemainingColor = () => {
-    return percentage > 90 ? COLORS.danger : COLORS.accent;
-  };
+  const a11yValue = useMemo(() => {
+    return `Monthly progress for ${month}: Spent ${currency}${spent.toFixed(0)} of ${currency}${budget.toFixed(0)} budget. ${currency}${remaining.toFixed(0)} ${isOver ? 'over budget' : 'remaining'}.`;
+  }, [month, spent, budget, currency, remaining, isOver]);
 
   return (
-    <View style={styles.container}>
+    <View 
+      style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
+      accessible={true}
+      accessibilityLabel={a11yValue}
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>MONTHLY PROGRESS</Text>
-        <Text style={styles.month}>{month}</Text>
+        <Text style={[styles.title, { color: colors.textMuted }]}>SUMMARY</Text>
+        <Text style={[styles.month, { color: colors.textDim }]} numberOfLines={1}>{month}</Text>
       </View>
 
       <View style={styles.content}>
-        <ProgressCircle percentage={percentage} size={96} />
-        
+        <View style={styles.circleWrap} aria-hidden={true}>
+          <ProgressCircle percentage={percentage} size={84} />
+        </View>
+
         <View style={styles.stats}>
-          <Text style={styles.spentAmount}>
-            {currency}{spent.toFixed(2)}
-          </Text>
-          <Text style={styles.budgetAmount}>
-            of {currency}{budget.toFixed(2)} budget
-          </Text>
-          <Text style={[styles.remainingText, { color: getRemainingColor() }]}>
-            {currency}{remaining.toFixed(2)} remaining
-          </Text>
-          <Text style={styles.savingsText}>
-            {currency}{savings.toFixed(2)} saved
+          <View style={styles.spentRow}>
+            <Text style={[styles.spentAmount, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+              {currency}{spent.toLocaleString()}
+            </Text>
+            <Text style={[styles.budgetTotal, { color: colors.textDim }]}>
+              / {currency}{budget.toLocaleString()}
+            </Text>
+          </View>
+          
+          <Text style={[styles.statusLabel, { color: statusColor }]}>
+            {isOver 
+              ? `${currency}${(spent - budget).toLocaleString()} Over Budget`
+              : `${currency}${remaining.toLocaleString()} Remaining`
+            }
           </Text>
         </View>
       </View>
@@ -57,60 +68,62 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.surfaceLight,
+    // Subtle inner shadow effect for premium feel
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
   },
   title: {
-    color: COLORS.textMuted,
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: FONTS.bold,
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   month: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    fontFamily: FONTS.regular,
+    fontSize: 11,
+    fontFamily: FONTS.medium,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
+    gap: 24,
+  },
+  circleWrap: {
+    flexShrink: 0,
   },
   stats: {
     flex: 1,
+    justifyContent: 'center',
   },
-  spentAmount: {
-    color: COLORS.text,
-    fontSize: 24,
-    fontFamily: FONTS.bold,
-  },
-  budgetAmount: {
-    color: COLORS.textMuted,
-    fontSize: 14,
-    fontFamily: FONTS.regular,
+  spentRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     marginBottom: 4,
   },
-  remainingText: {
-    fontSize: 14,
-    fontFamily: FONTS.medium,
-    marginTop: 2,
+  spentAmount: {
+    fontSize: 28,
+    fontFamily: FONTS.bold,
   },
-  savingsText: {
-    color: COLORS.info,
+  budgetTotal: {
     fontSize: 14,
     fontFamily: FONTS.medium,
-    marginTop: 2,
+    marginLeft: 4,
+  },
+  statusLabel: {
+    fontSize: 13,
+    fontFamily: FONTS.bold,
+    letterSpacing: 0.3,
   },
 });
 
-export default SummaryCard;
+export default React.memo(SummaryCard);

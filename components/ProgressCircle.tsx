@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, FONTS } from '../constants/theme';
+import { FONTS } from '../constants/theme';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface ProgressCircleProps {
   percentage: number;
@@ -8,28 +9,35 @@ interface ProgressCircleProps {
 }
 
 const ProgressCircle: React.FC<ProgressCircleProps> = ({ percentage, size = 96 }) => {
-  const getColor = () => {
-    if (percentage > 90) return COLORS.danger;
-    if (percentage > 70) return COLORS.warning;
-    return COLORS.primary;
-  };
+  const { colors } = useAppTheme();
+  
+  const color = useMemo(() => {
+    if (percentage > 90) return colors.danger;
+    if (percentage > 70) return colors.warning;
+    return colors.primary;
+  }, [percentage, colors]);
+
+  const displayPercent = useMemo(() => Math.round(percentage), [percentage]);
+
+  const containerStyle = useMemo(() => ({
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+  }), [size]);
+
+  const ringStyle = useMemo(() => ({
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    borderColor: color,
+  }), [size, color]);
 
   return (
-    <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}>
-      <View
-        style={[
-          styles.ring,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderColor: getColor(),
-          },
-        ]}
-      />
+    <View style={[styles.container, containerStyle]}>
+      <View style={[styles.ring, { borderColor: colors.surfaceLight }, ringStyle]} />
       <View style={styles.labelContainer}>
-        <Text style={[styles.label, { color: getColor() }]}>
-          {Math.round(percentage)}%
+        <Text style={[styles.label, { color }]}>
+          {displayPercent}%
         </Text>
       </View>
     </View>
@@ -45,7 +53,6 @@ const styles = StyleSheet.create({
   ring: {
     position: 'absolute',
     borderWidth: 6,
-    borderColor: COLORS.surfaceLight,
   },
   labelContainer: {
     justifyContent: 'center',
@@ -57,4 +64,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProgressCircle;
+export default React.memo(ProgressCircle);
