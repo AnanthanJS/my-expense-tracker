@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react-native';
+import IconChevronLeft from '@tabler/icons-react-native/dist/esm/icons/IconChevronLeft';
+import IconChevronRight from '@tabler/icons-react-native/dist/esm/icons/IconChevronRight';
 
 import { FONTS, SPACING } from '../constants/theme';
 import { getMonthName } from '../utils/storage';

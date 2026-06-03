@@ -9,7 +9,11 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { IconPlus, IconChevronDown, IconCheck, IconX, IconCategory } from '@tabler/icons-react-native';
+import IconPlus from '@tabler/icons-react-native/dist/esm/icons/IconPlus';
+import IconChevronDown from '@tabler/icons-react-native/dist/esm/icons/IconChevronDown';
+import IconCheck from '@tabler/icons-react-native/dist/esm/icons/IconCheck';
+import IconX from '@tabler/icons-react-native/dist/esm/icons/IconX';
+import IconCategory from '@tabler/icons-react-native/dist/esm/icons/IconCategory';
 import { FONTS } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';

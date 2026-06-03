@@ -9,7 +9,11 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { IconPlus, IconTrash, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react-native';
+import IconPlus from '@tabler/icons-react-native/dist/esm/icons/IconPlus';
+import IconTrash from '@tabler/icons-react-native/dist/esm/icons/IconTrash';
+import IconCheck from '@tabler/icons-react-native/dist/esm/icons/IconCheck';
+import IconX from '@tabler/icons-react-native/dist/esm/icons/IconX';
+import IconAlertCircle from '@tabler/icons-react-native/dist/esm/icons/IconAlertCircle';
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 import { FONTS, SPACING } from '../../constants/theme';

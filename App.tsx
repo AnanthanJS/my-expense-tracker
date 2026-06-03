@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import { NavigationContainer } from '@react-navigation/native';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Provider as PaperProvider, Snackbar } from 'react-native-paper';
 import { SafeAreaProvider, useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -25,81 +25,38 @@ import { AppProvider, useApp } from './context/AppContext';
 import { useAppTheme } from './hooks/useAppTheme';
 
 import BottomNavBar from './components/BottomNavBar';
-import MainHeader from './components/MainHeader';
 import ErrorBoundary from './components/ErrorBoundary';
+import AddExpenseSheet from './components/AddExpenseSheet';
 
-// Standard Lazy Imports (Bundler handles the .default mapping)
-const HomeScreen           = lazy(() => import('./components/screens/HomeScreen'));
-const RecentExpensesScreen = lazy(() => import('./components/screens/RecentExpensesScreen'));
-const SettingsScreen       = lazy(() => import('./components/screens/SettingsScreen'));
-const AboutScreen          = lazy(() => import('./components/screens/AboutScreen'));
+const DashboardScreen    = lazy(() => import('./components/screens/HomeScreen'));
+const AnalyticsScreen    = lazy(() => import('./components/screens/AnalyticsScreen'));
+const BudgetTabScreen    = lazy(() => import('./components/screens/BudgetTabScreen'));
+const MoreTabScreen      = lazy(() => import('./components/screens/MoreTabScreen'));
 
 SplashScreen.preventAutoHideAsync();
 
-const Tab = createMaterialTopTabNavigator();
+const Tab = createBottomTabNavigator();
 
-const TAB_CONFIG = {
-  Home:     { title: 'My Expense Tracker', subtitle: 'Track spending & stay on budget' },
-  Expenses: { title: 'Recent Expenses',    subtitle: 'All your transactions' },
-  Settings: { title: 'Settings',           subtitle: 'Customise your experience' },
-  About:    { title: 'About',              subtitle: 'App info & features' },
-};
-
-const ScreenFallback = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <ThemedActivityIndicator />
-  </View>
-);
-
-const ThemedActivityIndicator = () => {
+const ScreenFallback = () => {
   const { colors } = useAppTheme();
-  return <ActivityIndicator size="small" color={colors.primary} />;
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  );
 };
 
-const HomeWithHeader = () => (
-  <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Home.title} subtitle={TAB_CONFIG.Home.subtitle} />
-    <HomeScreen />
-  </Suspense>
-);
-
-const ExpensesWithHeader = () => (
-  <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Expenses.title} subtitle={TAB_CONFIG.Expenses.subtitle} />
-    <RecentExpensesScreen />
-  </Suspense>
-);
-
-interface SettingsWithHeaderProps {
-  pendingRouteName?: string | null;
-  onUnsavedChangesChange?: (hasChanges: boolean) => void;
-  onClearPendingRoute?: () => void;
-}
-
-const SettingsWithHeader: React.FC<SettingsWithHeaderProps> = (props) => (
-  <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Settings.title} subtitle={TAB_CONFIG.Settings.subtitle} />
-    <SettingsScreen {...props} />
-  </Suspense>
-);
-
-const AboutWithHeader = () => (
-  <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.About.title} subtitle={TAB_CONFIG.About.subtitle} />
-    <AboutScreen />
-  </Suspense>
-);
+// Placeholder component for the Add tab (never actually rendered — FAB intercepts)
+const AddPlaceholder = () => null;
 
 function AppContent() {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { isLoading, feedback, hideFeedback } = useApp();
-  const [hasUnsavedSettings, setHasUnsavedSettings] = useState(false);
-  const [pendingSettingsRoute, setPendingSettingsRoute] = useState<string | null>(null);
+  const [isAddSheetVisible, setAddSheetVisible] = useState(false);
 
-  const clearPendingSettingsRoute = useCallback(() => {
-    setPendingSettingsRoute(null);
-  }, []);
+  const handleOpenAddSheet = useCallback(() => setAddSheetVisible(true), []);
+  const handleCloseAddSheet = useCallback(() => setAddSheetVisible(false), []);
 
   if (isLoading) {
     return (
@@ -112,57 +69,124 @@ function AppContent() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <Tab.Navigator
-        tabBarPosition="bottom"
         tabBar={(props) => (
           <BottomNavBar
             {...props}
-            hasUnsavedSettings={hasUnsavedSettings}
-            onUnsavedSettingsNavigation={setPendingSettingsRoute}
+            onAddPress={handleOpenAddSheet}
           />
         )}
-        initialRouteName="Home"
+        initialRouteName="Dashboard"
         screenOptions={{
-          swipeEnabled: true,
+          headerShown: false,
           lazy: true,
-          lazyPlaceholder: () => <ScreenFallback />,
         }}
       >
-        <Tab.Screen name="Home" component={HomeWithHeader} />
-        <Tab.Screen name="Expenses" component={ExpensesWithHeader} />
-        <Tab.Screen name="Settings">
+        <Tab.Screen name="Dashboard">
           {() => (
-            <SettingsWithHeader
-              pendingRouteName={pendingSettingsRoute}
-              onUnsavedChangesChange={setHasUnsavedSettings}
-              onClearPendingRoute={clearPendingSettingsRoute}
-            />
+            <Suspense fallback={<ScreenFallback />}>
+              <DashboardScreen />
+            </Suspense>
           )}
         </Tab.Screen>
-        <Tab.Screen name="About" component={AboutWithHeader} />
+
+        <Tab.Screen name="Analytics">
+          {() => (
+            <Suspense fallback={<ScreenFallback />}>
+              <AnalyticsScreen />
+            </Suspense>
+          )}
+        </Tab.Screen>
+
+        <Tab.Screen
+          name="Add"
+          component={AddPlaceholder}
+          listeners={{
+            tabPress: (e) => {
+              e.preventDefault();
+              handleOpenAddSheet();
+            },
+          }}
+        />
+
+        <Tab.Screen name="Budget">
+          {() => (
+            <Suspense fallback={<ScreenFallback />}>
+              <BudgetTabScreen />
+            </Suspense>
+          )}
+        </Tab.Screen>
+
+        <Tab.Screen name="More">
+          {() => (
+            <Suspense fallback={<ScreenFallback />}>
+              <MoreTabScreen />
+            </Suspense>
+          )}
+        </Tab.Screen>
       </Tab.Navigator>
+
+      <AddExpenseSheet
+        visible={isAddSheetVisible}
+        onClose={handleCloseAddSheet}
+      />
 
       <Snackbar
         visible={feedback.visible}
         onDismiss={hideFeedback}
         duration={3000}
         style={{
-          backgroundColor: feedback.type === 'error' ? colors.danger : colors.surface,
-          marginBottom: 100,
+          backgroundColor: feedback.type === 'error' ? colors.danger : colors.surfaceElevated,
+          marginBottom: 110,
+          borderRadius: 12,
         }}
         theme={{
           colors: {
-            inverseOnSurface: feedback.type === 'error' ? colors.background : colors.text,
+            inverseOnSurface: feedback.type === 'error' ? '#FFF' : colors.text,
             inversePrimary: colors.primary,
           },
         }}
-        action={{
-          label: 'Dismiss',
-          onPress: hideFeedback,
-        }}
+        action={{ label: 'Dismiss', onPress: hideFeedback }}
       >
         {feedback.message}
       </Snackbar>
     </View>
+  );
+}
+
+function ThemedApp() {
+  const { isDark, colors, paperTheme } = useAppTheme();
+
+  return (
+    <PaperProvider theme={paperTheme}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor="transparent"
+          translucent
+        />
+        <NavigationContainer theme={{
+          dark: isDark,
+          colors: {
+            primary: colors.primary,
+            background: colors.background,
+            card: colors.surface,
+            text: colors.text,
+            border: colors.border,
+            notification: colors.secondary,
+          },
+          fonts: Platform.select({
+            default: {
+              regular: { fontFamily: FONTS.regular, fontWeight: '400' },
+              medium:  { fontFamily: FONTS.medium,  fontWeight: '500' },
+              bold:    { fontFamily: FONTS.bold,    fontWeight: '700' },
+              heavy:   { fontFamily: FONTS.bold,    fontWeight: '900' },
+            }
+          })
+        }}>
+          <AppContent />
+        </NavigationContainer>
+      </View>
+    </PaperProvider>
   );
 }
 
@@ -173,54 +197,21 @@ export default function App() {
     DMSans_700Bold,
   });
 
-  const { isDark, colors, paperTheme } = useAppTheme();
-
   useEffect(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  if (!fontsLoaded) return null;
 
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ErrorBoundary>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <PaperProvider theme={paperTheme}>
-            <AppProvider>
-              <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <StatusBar 
-                  barStyle={isDark ? 'light-content' : 'dark-content'} 
-                  backgroundColor="transparent"
-                  translucent
-                />
-                <NavigationContainer theme={{
-                  dark: isDark,
-                  colors: {
-                    primary: colors.primary,
-                    background: colors.background,
-                    card: colors.surface,
-                    text: colors.text,
-                    border: colors.surfaceLight,
-                    notification: colors.accent,
-                  },
-                  fonts: Platform.select({
-                    default: {
-                      regular: { fontFamily: FONTS.regular, fontWeight: '400' },
-                      medium: { fontFamily: FONTS.medium, fontWeight: '500' },
-                      bold: { fontFamily: FONTS.bold, fontWeight: '700' },
-                      heavy: { fontFamily: FONTS.bold, fontWeight: '900' },
-                    }
-                  })
-                }}>
-                  <AppContent />
-                </NavigationContainer>
-              </View>
-            </AppProvider>
-          </PaperProvider>
+          <AppProvider>
+            <ThemedApp />
+          </AppProvider>
         </GestureHandlerRootView>
       </ErrorBoundary>
     </SafeAreaProvider>
@@ -228,7 +219,5 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
 });

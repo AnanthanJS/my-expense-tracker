@@ -7,16 +7,14 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import type { DimensionValue } from 'react-native';
-import {
-  IconChartBar,
-  IconSwipe,
-  IconPlus,
-  IconArrowRight,
-  IconCheck,
-  IconFilter,
-  IconFileExport,
-  IconSettings,
-} from '@tabler/icons-react-native';
+import IconChartBar from '@tabler/icons-react-native/dist/esm/icons/IconChartBar';
+import IconSwipe from '@tabler/icons-react-native/dist/esm/icons/IconSwipe';
+import IconPlus from '@tabler/icons-react-native/dist/esm/icons/IconPlus';
+import IconArrowRight from '@tabler/icons-react-native/dist/esm/icons/IconArrowRight';
+import IconCheck from '@tabler/icons-react-native/dist/esm/icons/IconCheck';
+import IconFilter from '@tabler/icons-react-native/dist/esm/icons/IconFilter';
+import IconFileExport from '@tabler/icons-react-native/dist/esm/icons/IconFileExport';
+import IconSettings from '@tabler/icons-react-native/dist/esm/icons/IconSettings';
 import type { IconProps } from '@tabler/icons-react-native';
 import { FONTS } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';

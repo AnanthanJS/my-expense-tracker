@@ -1,0 +1,22 @@
+diff --git a/node_modules/@babel/plugin-transform-react-jsx/lib/create-plugin.js b/node_modules/@babel/plugin-transform-react-jsx/lib/create-plugin.js
+index e89ab68..a1458a6 100644
+--- a/node_modules/@babel/plugin-transform-react-jsx/lib/create-plugin.js
++++ b/node_modules/@babel/plugin-transform-react-jsx/lib/create-plugin.js
+@@ -335,7 +335,7 @@ You can set \`throwIfNamespace: false\` to bypass this warning.`);
+           switch (name) {
+             case "__source":
+             case "__self":
+-              if (extracted[name]) throw sourceSelfError(path, name);
++              if (extracted[name]) { /* patched to not throw */ }
+             case "key":
+               {
+                 const keyValue = convertAttributeValue(attr.node.value);
+@@ -465,7 +465,7 @@ You can set \`throwIfNamespace: false\` to bypass this warning.`);
+         } = attr;
+         const name = _core.types.isJSXAttribute(node) && _core.types.isJSXIdentifier(node.name) && node.name.name;
+         if (runtime === "automatic" && (name === "__source" || name === "__self")) {
+-          if (found[name]) throw sourceSelfError(path, name);
++          if (found[name]) { /* patched to not throw */ }
+           found[name] = true;
+         }
+         accumulateAttribute(props, attr);

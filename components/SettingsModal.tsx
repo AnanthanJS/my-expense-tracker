@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { IconX } from '@tabler/icons-react-native';
+import IconX from '@tabler/icons-react-native/dist/esm/icons/IconX';
 import { FONTS } from '../constants/theme';
 import type { Settings } from '../utils/storage';
 import { useAppTheme } from '../hooks/useAppTheme';

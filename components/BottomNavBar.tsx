@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,86 +8,46 @@ import {
   Animated,
 } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  IconHome, 
-  IconReceipt2, 
-  IconSettings, 
-  IconInfoCircle,
-} from '@tabler/icons-react-native';
+import IconLayoutDashboard from '@tabler/icons-react-native/dist/esm/icons/IconLayoutDashboard';
+import IconChartBar from '@tabler/icons-react-native/dist/esm/icons/IconChartBar';
+import IconPlus from '@tabler/icons-react-native/dist/esm/icons/IconPlus';
+import IconTarget from '@tabler/icons-react-native/dist/esm/icons/IconTarget';
+import IconApps from '@tabler/icons-react-native/dist/esm/icons/IconApps';
 import type { IconProps } from '@tabler/icons-react-native';
-import { FONTS, SPACING } from '../constants/theme';
+import { FONTS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
-
-export type TabName = 'home' | 'recent' | 'settings' | 'about';
+import { useApp } from '../context/AppContext';
 
 interface NavItem {
-  key: TabName;
+  key: string;
   label: string;
   icon: React.FC<IconProps>;
   routeName: string;
+  isAdd?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'home',     label: 'Home',     icon: IconHome,         routeName: 'Home' },
-  { key: 'recent',   label: 'Expenses', icon: IconReceipt2,     routeName: 'Expenses' },
-  { key: 'settings', label: 'Settings', icon: IconSettings,     routeName: 'Settings' },
-  { key: 'about',    label: 'About',    icon: IconInfoCircle,   routeName: 'About' },
+  { key: 'dashboard', label: 'Home',     icon: IconLayoutDashboard, routeName: 'Dashboard' },
+  { key: 'analytics', label: 'Analytics',icon: IconChartBar,        routeName: 'Analytics' },
+  { key: 'add',       label: '',         icon: IconPlus,            routeName: 'Add', isAdd: true },
+  { key: 'budget',    label: 'Budget',   icon: IconTarget,          routeName: 'Budget' },
+  { key: 'more',      label: 'More',     icon: IconApps,            routeName: 'More' },
 ];
 
-const PILL_PADDING = 8;
-const TAB_GAP = 4;
-
-interface BottomNavBarProps extends MaterialTopTabBarProps {
-  hasUnsavedSettings: boolean;
-  onUnsavedSettingsNavigation: (routeName: string) => void;
+interface BottomNavBarProps extends BottomTabBarProps {
+  onAddPress: () => void;
 }
 
 const BottomNavBar: React.FC<BottomNavBarProps> = ({
   state,
   navigation,
-  position,
-  hasUnsavedSettings,
-  onUnsavedSettingsNavigation,
+  onAddPress,
 }) => {
   const { colors } = useAppTheme();
+  const { unreadCount } = useApp();
   const insets = useSafeAreaInsets();
-  const currentRouteName = state.routeNames[state.index];
-  
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    const { width } = event.nativeEvent.layout;
-    setContainerWidth(width);
-  }, []);
-
-  const handlePress = useCallback((routeName: string) => {
-    const targetRoute = state.routes.find((route) => route.name === routeName);
-    const event = navigation.emit({
-      type: 'tabPress',
-      target: targetRoute?.key,
-      canPreventDefault: true,
-    });
-
-    if (currentRouteName === 'Settings' && routeName !== 'Settings' && hasUnsavedSettings) {
-      onUnsavedSettingsNavigation(routeName);
-      return;
-    }
-
-    if (currentRouteName !== routeName && !event.defaultPrevented) {
-      navigation.navigate(routeName);
-    }
-  }, [currentRouteName, hasUnsavedSettings, navigation, onUnsavedSettingsNavigation, state.routes]);
-
-  const numTabs = state.routes.length;
-  const usableWidth = containerWidth - (PILL_PADDING * 2) - (TAB_GAP * (numTabs - 1));
-  const tabWidth = containerWidth > 0 ? usableWidth / numTabs : 0;
-
-  const translateX = position.interpolate({
-    inputRange: state.routes.map((_, i) => i),
-    outputRange: state.routes.map((_, i) => i * (tabWidth + TAB_GAP)),
-  });
 
   const bottomOffset = Platform.select({
     ios: Math.max(insets.bottom, SPACING.lg),
@@ -95,53 +55,88 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
     default: SPACING.lg,
   });
 
+  const handlePress = useCallback((item: NavItem, index: number) => {
+    if (item.isAdd) {
+      onAddPress();
+      return;
+    }
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: state.routes[index]?.key,
+      canPreventDefault: true,
+    });
+    if (state.index !== index && !event.defaultPrevented) {
+      navigation.navigate(item.routeName);
+    }
+  }, [navigation, state, onAddPress]);
+
   return (
     <View style={[styles.wrapper, { bottom: bottomOffset }]}>
-      <View 
-        style={[styles.pill, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
-        onLayout={handleLayout}
-        accessible={true}
-        accessibilityRole="tablist"
-      >
-        {tabWidth > 0 && (
-          <Animated.View 
-            style={[
-              styles.animatedPill, 
-              { 
-                backgroundColor: colors.primary,
-                width: tabWidth,
-                transform: [{ translateX }]
-              },
-            ]} 
-          />
-        )}
-        
+      <View style={[
+        styles.pill,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.primary,
+        },
+      ]}>
         {NAV_ITEMS.map((item, index) => {
+          if (item.isAdd) {
+            return (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.fabContainer]}
+                onPress={() => handlePress(item, index)}
+                activeOpacity={0.85}
+                accessibilityLabel="Add expense"
+                accessibilityRole="button"
+              >
+                <View style={[styles.fab, { backgroundColor: colors.primary, ...SHADOWS.md }]}>
+                  <IconPlus size={26} color="#FFFFFF" strokeWidth={2.5} />
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
           const isActive = state.index === index;
           const Icon = item.icon;
-          
+          const showBadge = item.routeName === 'Budget' && unreadCount > 0;
+
           return (
             <TouchableOpacity
               key={item.key}
               style={styles.tab}
-              onPress={() => handlePress(item.routeName)}
+              onPress={() => handlePress(item, index)}
               activeOpacity={0.7}
               accessibilityLabel={`${item.label} tab`}
-              accessibilityHint={`Navigates to ${item.label} screen`}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
             >
-              <Icon 
-                size={22} 
-                color={isActive ? colors.background : colors.textMuted} 
-                strokeWidth={2}
-              />
+              <View style={styles.iconWrap}>
+                <View style={[
+                  styles.iconBg,
+                  isActive && { backgroundColor: colors.primary + '20' },
+                ]}>
+                  <Icon
+                    size={22}
+                    color={isActive ? colors.primary : colors.textDim}
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+                  {showBadge && (
+                    <View style={[styles.badge, { backgroundColor: colors.danger }]}>
+                      <Text style={styles.badgeText}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
               <Text style={[
-                styles.label, 
-                { 
-                  color: isActive ? colors.background : colors.textMuted,
-                  fontFamily: isActive ? FONTS.bold : FONTS.medium 
-                }
+                styles.label,
+                {
+                  color: isActive ? colors.primary : colors.textDim,
+                  fontFamily: isActive ? FONTS.bold : FONTS.regular,
+                },
               ]}>
                 {item.label}
               </Text>
@@ -163,44 +158,69 @@ const styles = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row',
-    borderRadius: 40,
-    paddingVertical: 8,
-    paddingHorizontal: PILL_PADDING,
     alignItems: 'center',
-    gap: TAB_GAP,
+    borderRadius: RADIUS.full,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     borderWidth: 1,
-    position: 'relative',
-    maxWidth: '94%',
-    shadowColor: '#000',
+    maxWidth: '96%',
+    minWidth: 320,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  animatedPill: {
-    position: 'absolute',
-    left: PILL_PADDING,
-    top: 8,
-    bottom: 8,
-    borderRadius: 32,
-    zIndex: 0,
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 14,
   },
   tab: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 32,
-    gap: 4,
-    zIndex: 1,
-    minWidth: 78,
+    gap: 2,
+    paddingVertical: SPACING.xs,
   },
-  icon: {
-    fontSize: 18,
+  iconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBg: {
+    width: 40,
+    height: 36,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontFamily: FONTS.bold,
   },
   label: {
     fontSize: 10,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
+  },
+  fabContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: SPACING.sm,
+  },
+  fab: {
+    width: 54,
+    height: 54,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -18,
   },
 });
 

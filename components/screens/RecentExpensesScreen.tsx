@@ -12,18 +12,16 @@ import {
   Alert,
 } from 'react-native';
 import type { ListRenderItemInfo } from 'react-native';
-import {
-  IconSearch,
-  IconX,
-  IconFilter,
-  IconCheck,
-  IconArrowsSort,
-  IconTrendingUp,
-  IconTrendingDown,
-  IconFileExport,
-  IconFileTypePdf,
-  IconFileImport,
-} from '@tabler/icons-react-native';
+import IconSearch from '@tabler/icons-react-native/dist/esm/icons/IconSearch';
+import IconX from '@tabler/icons-react-native/dist/esm/icons/IconX';
+import IconFilter from '@tabler/icons-react-native/dist/esm/icons/IconFilter';
+import IconCheck from '@tabler/icons-react-native/dist/esm/icons/IconCheck';
+import IconArrowsSort from '@tabler/icons-react-native/dist/esm/icons/IconArrowsSort';
+import IconTrendingUp from '@tabler/icons-react-native/dist/esm/icons/IconTrendingUp';
+import IconTrendingDown from '@tabler/icons-react-native/dist/esm/icons/IconTrendingDown';
+import IconFileExport from '@tabler/icons-react-native/dist/esm/icons/IconFileExport';
+import IconFileTypePdf from '@tabler/icons-react-native/dist/esm/icons/IconFileTypePdf';
+import IconFileImport from '@tabler/icons-react-native/dist/esm/icons/IconFileImport';
 import { FONTS, CATEGORY_COLORS, SPACING } from '../../constants/theme';
 import type { Expense } from '../../utils/storage';
 import { formatDate } from '../../utils/formatDate';

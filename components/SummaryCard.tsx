@@ -22,7 +22,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   const percentage  = useMemo(() => (spent / budget) * 100, [spent, budget]);
   const remaining   = useMemo(() => Math.max(budget - spent, 0), [budget, spent]);
   const isOver      = spent > budget;
-  const statusColor = useMemo(() => isOver ? colors.danger : colors.accent, [isOver, colors]);
+  const statusColor = useMemo(() => isOver ? colors.danger : colors.primary, [isOver, colors]);
 
   const a11yValue = useMemo(() => {
     return `Monthly progress for ${month}: Spent ${currency}${spent.toFixed(0)} of ${currency}${budget.toFixed(0)} budget. ${currency}${remaining.toFixed(0)} ${isOver ? 'over budget' : 'remaining'}.`;

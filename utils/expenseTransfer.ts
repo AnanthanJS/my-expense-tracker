@@ -1,5 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
+import { File as ExpoFile, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { Expense, Settings } from './storage';
@@ -135,7 +136,6 @@ const buildExpensesPdfHtml = (expenses: Expense[], settings: Settings) => {
 };
 
 export const exportExpensesAsJson = async (expenses: Expense[]) => {
-  await assertCanShare();
   const file: ExpenseExportFile = {
     app: 'my-expense-tracker',
     version: EXPORT_VERSION,
@@ -143,12 +143,27 @@ export const exportExpensesAsJson = async (expenses: Expense[]) => {
     expenses,
   };
 
-  const exportFile = new File(Paths.cache, getExportName('json'));
+  const jsonString = JSON.stringify(file, null, 2);
+  const fileName = getExportName('json');
+
+  if (Platform.OS === 'web') {
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  await assertCanShare();
+  const exportFile = new ExpoFile(Paths.cache, fileName);
   if (exportFile.exists) {
     exportFile.delete();
   }
   exportFile.create({ overwrite: true });
-  exportFile.write(JSON.stringify(file, null, 2));
+  exportFile.write(jsonString);
 
   await Sharing.shareAsync(exportFile.uri, {
     mimeType: 'application/json',
@@ -157,6 +172,13 @@ export const exportExpensesAsJson = async (expenses: Expense[]) => {
 };
 
 export const exportExpensesAsPdf = async (expenses: Expense[], settings: Settings) => {
+  if (Platform.OS === 'web') {
+    await Print.printAsync({
+      html: buildExpensesPdfHtml(expenses, settings),
+    });
+    return;
+  }
+
   await assertCanShare();
   const { uri } = await Print.printToFileAsync({
     html: buildExpensesPdfHtml(expenses, settings),
@@ -176,12 +198,18 @@ export const pickExpensesJson = async () => {
     copyToCacheDirectory: true,
   });
 
-  if (result.canceled) {
+  if (result.canceled || !result.assets || result.assets.length === 0) {
     return null;
   }
 
   const asset = result.assets[0];
-  const contents = await new File(asset.uri).text();
+  let contents = '';
+
+  if (Platform.OS === 'web' && asset.file) {
+    contents = await asset.file.text();
+  } else {
+    contents = await new ExpoFile(asset.uri).text();
+  }
 
   return readExpensesFromJson(contents);
 };
