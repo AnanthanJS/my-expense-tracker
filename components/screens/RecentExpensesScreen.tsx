@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import type { ListRenderItemInfo } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import {
   IconSearch,
   IconX,
@@ -25,6 +26,7 @@ import {
   IconFileImport,
   IconDotsVertical,
   IconReceipt,
+  IconTrash,
 } from '@tabler/icons-react-native';
 import { FONTS, CATEGORY_COLORS, GUTTER, SCRIM } from '../../constants/theme';
 import type { Expense } from '../../utils/storage';
@@ -46,10 +48,24 @@ interface ExpenseRowProps {
 }
 
 const ExpenseRow = React.memo(({ item, currency, onDelete, colors }: ExpenseRowProps) => {
-  const handleDelete = useCallback(() => onDelete(item.id), [item.id, onDelete]);
+  // (#23) Destructive delete with confirmation prompt
+  const handleDelete = useCallback(() => {
+    Alert.alert(
+      'Delete Expense',
+      `Are you sure you want to delete "${item.description}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.id) },
+      ],
+    );
+  }, [item.id, item.description, onDelete]);
 
   return (
-    <View
+    // (#29) Fade in on mount, fade out on delete, shift neighbours smoothly
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(180)}
+      layout={LinearTransition.duration(200)}
       style={[styles.item, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
       accessible={true}
       accessibilityLabel={`Expense: ${item.description}, Amount: ${currency}${item.amount.toFixed(2)}, Category: ${item.category}, Date: ${formatDate(item.date)}`}
@@ -81,18 +97,18 @@ const ExpenseRow = React.memo(({ item, currency, onDelete, colors }: ExpenseRowP
         >
           {currency}{item.amount.toFixed(2)}
         </Text>
-        {/* (#14, #15) accessibilityLabel + role; hitSlop 12 all sides */}
+        {/* (#14, #15, #23) accessibilityLabel + role; hitSlop 12; destructive icon & color */}
         <TouchableOpacity
           onPress={handleDelete}
           style={styles.deleteBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Delete expense"
+          accessibilityLabel={`Delete ${item.description} expense`}
           accessibilityRole="button"
         >
-          <IconX size={18} color={colors.textDim} strokeWidth={2.5} />
+          <IconTrash size={16} color={colors.danger} strokeWidth={2} />
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 });
 

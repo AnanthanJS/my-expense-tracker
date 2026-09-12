@@ -10,6 +10,7 @@ import {
   Modal,
 } from 'react-native';
 import { IconPlus, IconTrash, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react-native';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 import { FONTS, SPACING, GUTTER, SCRIM, getCategoryColor } from '../../constants/theme';
@@ -256,9 +257,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <View style={{ height: navbarHeight + (hasChanges ? 72 : 0) }} />
       </ScrollView>
 
-      {/* (#25) Sticky save bar — always below ScrollView, visible whenever hasChanges */}
+      {/* (#25, #29) Sticky save bar — animates smoothly on mount/unmount */}
       {hasChanges && (
-        <View
+        <Animated.View
+          entering={FadeInDown.duration(200)}
+          exiting={FadeOutDown.duration(180)}
           style={[
             styles.saveBar,
             {
@@ -284,7 +287,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               {isSaving ? 'Saving...' : 'Save All Changes'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
 
       {/* Save Changes Confirmation */}

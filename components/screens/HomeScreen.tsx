@@ -6,6 +6,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { FONTS, SPACING, GUTTER } from '../../constants/theme';
 import { getMonthName } from '../../utils/storage';
 import { useApp } from '../../context/AppContext';
@@ -91,9 +92,11 @@ const HomeScreen: React.FC = () => {
           currency={settings.currency}
         />
 
-        {/* (#26) Stat row is always rendered to avoid layout jump.
-            Shows '—' placeholders when there are no expenses. */}
-        <View style={[styles.statsRow, isNarrow && styles.statsRowWrap]}>
+        {/* (#26, #29) Stat row is always rendered to avoid layout jump; animates layout smoothly */}
+        <Animated.View
+          layout={LinearTransition.duration(200)}
+          style={[styles.statsRow, isNarrow && styles.statsRowWrap]}
+        >
           <View style={[
             styles.statCard,
             { backgroundColor: colors.surface, borderColor: colors.surfaceLight },
@@ -151,7 +154,7 @@ const HomeScreen: React.FC = () => {
               {filteredExpenses.length > 0 ? `${settings.currency}${savings}` : '—'}
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* (#4) Dynamic navbar clearance replaces hardcoded height: 100 */}
         <View style={{ height: navbarHeight }} />

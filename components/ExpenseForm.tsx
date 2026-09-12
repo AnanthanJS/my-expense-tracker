@@ -9,6 +9,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { IconPlus, IconChevronDown, IconCheck, IconX, IconCategory } from '@tabler/icons-react-native';
 import { FONTS, SCRIM } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
@@ -23,6 +24,37 @@ interface ExpenseFormProps {
   }) => void;
 }
 
+// ---------------------------------------------------------------------------
+// Date masking helpers (#18)
+// ---------------------------------------------------------------------------
+
+/** Apply YYYY-MM-DD mask as the user types. Strips non-digits, inserts hyphens. */
+function maskDate(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
+/** Returns an error string or null. */
+function validateDate(value: string): string | null {
+  if (value.length === 0) return null; // handled at submit
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null; // still typing
+  const [y, m, d] = value.split('-').map(Number);
+  if (m < 1 || m > 12) return 'Invalid month';
+  const daysInMonth = new Date(y, m, 0).getDate();
+  if (d < 1 || d > daysInMonth) return 'Invalid day';
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return 'Invalid date';
+  return null;
+}
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ---------------------------------------------------------------------------
+
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
   const { colors } = useAppTheme();
   const { showFeedback, settings } = useApp();
@@ -30,7 +62,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount]           = useState('');
   const [category, setCategory]       = useState(settings.categories[0]);
-  const [date, setDate]               = useState(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate]               = useState(todayISO);
+  const [dateError, setDateError]     = useState<string | null>(null); // (#18)
   const [isPickerVisible, setIsPickerVisible] = useState(false);
 
   useEffect(() => {
@@ -39,6 +72,18 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
     }
   }, [settings.categories, category]);
 
+  // (#18) Apply mask on every keystroke
+  const handleDateChange = useCallback((raw: string) => {
+    const masked = maskDate(raw);
+    setDate(masked);
+    // Only show error once the field is fully typed
+    if (masked.length === 10) {
+      setDateError(validateDate(masked));
+    } else {
+      setDateError(null);
+    }
+  }, []);
+
   const handleSubmit = useCallback(() => {
     if (!description.trim()) {
       showFeedback('Please enter a description.', 'error');
@@ -46,6 +91,16 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
     }
     if (!amount || isNaN(parseFloat(amount))) {
       showFeedback('Please enter a valid amount.', 'error');
+      return;
+    }
+    // (#18) Validate date before submitting
+    if (date.length !== 10 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      showFeedback('Please enter a date in YYYY-MM-DD format.', 'error');
+      return;
+    }
+    const dateErr = validateDate(date);
+    if (dateErr) {
+      showFeedback(`Date: ${dateErr}.`, 'error');
       return;
     }
 
@@ -58,6 +113,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
 
     setDescription('');
     setAmount('');
+    setDate(todayISO());
+    setDateError(null);
   }, [description, amount, category, date, onAdd, showFeedback]);
 
   return (
@@ -67,7 +124,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
       <View style={styles.form}>
         {/* Row 1: Description + Amount */}
         <View style={styles.row}>
-          {/* (#14) Label + accessibilityLabel for description */}
           <TextInput
             style={[styles.input, styles.flex1, { backgroundColor: colors.surfaceLight, color: colors.text }]}
             placeholder="What was it for?"
@@ -86,7 +142,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
               keyboardType="decimal-pad"
               value={amount}
               onChangeText={setAmount}
-              accessibilityLabel={`Amount in ${settings.currency}`} // (#14)
+              accessibilityLabel={`Amount in ${settings.currency}`}
             />
           </View>
         </View>
@@ -98,7 +154,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
             style={[styles.selectField, { backgroundColor: colors.surfaceLight, borderColor: colors.surfaceLight }]}
             onPress={() => setIsPickerVisible(true)}
             activeOpacity={0.7}
-            accessibilityLabel={`Category: ${category}`} // (#14)
+            accessibilityLabel={`Category: ${category}`}
             accessibilityRole="button"
             accessibilityHint="Opens category picker"
           >
@@ -111,26 +167,51 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
         </View>
 
         {/* Row 2: Date + Add */}
-        <View style={styles.row}>
-          {/* (#14) Label + accessibilityLabel for date */}
-          <TextInput
-            style={[styles.input, styles.flex1, { backgroundColor: colors.surfaceLight, color: colors.text }]}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.textDim}
-            value={date}
-            onChangeText={setDate}
-            accessibilityLabel="Date in YYYY-MM-DD format"
-          />
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={handleSubmit}
-            activeOpacity={0.8}
-            accessibilityLabel="Add expense"
-            accessibilityRole="button"
-          >
-            <IconPlus size={18} color={colors.onPrimary} strokeWidth={3} />
-            <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>Add</Text>
-          </TouchableOpacity>
+        <View style={styles.selectGroup}>
+          <Text style={[styles.label, { color: colors.textMuted }]}>Date</Text>
+          <View style={styles.row}>
+            <View style={styles.flex1}>
+              {/* (#18) Masked date input with YYYY-MM-DD hint and inline validation */}
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.surfaceLight,
+                    color: colors.text,
+                    borderWidth: dateError ? 1.5 : 0,
+                    borderColor: dateError ? colors.danger : 'transparent',
+                  },
+                ]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.textDim}
+                value={date}
+                onChangeText={handleDateChange}
+                keyboardType="numeric"
+                maxLength={10}
+                accessibilityLabel="Date in YYYY-MM-DD format"
+              />
+              {/* (#18) Inline error below the field */}
+              {dateError && (
+                <Animated.Text
+                  entering={FadeIn.duration(150)}
+                  exiting={FadeOut.duration(150)}
+                  style={[styles.dateError, { color: colors.danger }]}
+                >
+                  {dateError}
+                </Animated.Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={handleSubmit}
+              activeOpacity={0.8}
+              accessibilityLabel="Add expense"
+              accessibilityRole="button"
+            >
+              <IconPlus size={18} color={colors.onPrimary} strokeWidth={3} />
+              <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>Add</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -141,7 +222,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
         animationType="slide"
         onRequestClose={() => setIsPickerVisible(false)}
       >
-        {/* (#13) SCRIM token */}
         <View style={[styles.modalOverlay, { backgroundColor: `rgba(0,0,0,${SCRIM})` }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
@@ -160,14 +240,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAdd }) => {
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[
-                    styles.pickerItem,
-                    category === item && { backgroundColor: colors.surfaceLight },
-                  ]}
-                  onPress={() => {
-                    setCategory(item);
-                    setIsPickerVisible(false);
-                  }}
+                  style={[styles.pickerItem, category === item && { backgroundColor: colors.surfaceLight }]}
+                  onPress={() => { setCategory(item); setIsPickerVisible(false); }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: category === item }}
                   accessibilityLabel={item}
@@ -211,7 +285,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     minHeight: 52,
   },
-  // (#32) Flexible amount field with currency prefix
   amountWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -232,6 +305,13 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     paddingVertical: Platform.OS === 'ios' ? 14 : 10,
     minWidth: 60,
+  },
+  // (#18) Inline date validation
+  dateError: {
+    fontSize: 11,
+    fontFamily: FONTS.medium,
+    marginTop: 4,
+    marginLeft: 4,
   },
   selectGroup: { gap: 8 },
   label: { fontSize: 12, fontFamily: FONTS.medium, marginLeft: 4 },
@@ -256,8 +336,6 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   addButtonText: { fontSize: 15, fontFamily: FONTS.bold },
-
-  // Modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

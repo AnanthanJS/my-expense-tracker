@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { FONTS, CATEGORY_COLORS, SPACING } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 
@@ -27,7 +28,10 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
   if (expenses.length === 0) return null;
 
   return (
-    <View 
+    <Animated.View 
+      entering={FadeIn.duration(250)}
+      exiting={FadeOut.duration(200)}
+      layout={LinearTransition.duration(200)}
       style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
       accessible={true}
       accessibilityLabel={`Spending breakdown by category. Total spent: ${currency}${totalSpent.toFixed(2)}`}
@@ -64,7 +68,7 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

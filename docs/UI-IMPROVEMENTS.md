@@ -293,7 +293,7 @@ column. On iPad the month picker becomes a full-width bar, cards stretch to
 
 ## Tier 4 — Interaction & information architecture
 
-### [ ] 18. The date field is the weakest point in the primary flow
+### [x] 18. The date field is the weakest point in the primary flow
 
 `components/ExpenseForm.tsx:105–117`
 
@@ -358,7 +358,7 @@ form, and blank space where the breakdown and stat cards would be.
 
 ---
 
-### [ ] 23. `[BEHAVIOR]` Delete is one tap, unconfirmed, unrecoverable
+### [x] 23. `[BEHAVIOR]` Delete is one tap, unconfirmed, unrecoverable
 
 Both lists. No confirmation, no undo. The global `Snackbar` in `App.tsx` is the
 natural home for an undo affordance.
@@ -433,7 +433,7 @@ from the live design.
 
 ---
 
-### [ ] 29. `reanimated` is installed and essentially unused
+### [x] 29. `reanimated` is installed and essentially unused
 
 Only the nav pill animates. Rows appear and vanish instantly on add/delete, the
 stat grid pops in with no transition, the Save button appears abruptly.
@@ -499,13 +499,12 @@ does. Phase 4 is presentation plus copy, with the exception noted per item.
 |---|---|---|
 | 1 — Visible defects | 5 | 5 |
 | 2 — Design system | 6 | 6 |
-| 3 — Accessibility | 6 | 4 |
-| 4 — Interaction & IA | 10 | 7 |
-| 5 — Polish | 5 | 4 |
-| **Total** | **32** | **26** |
+| 3 — Accessibility | 6 | 6 |
+| 4 — Interaction & IA | 10 | 9 |
+| 5 — Polish | 5 | 5 |
+| **Total** | **32** | **31** |
 
-Deferred (`[BEHAVIOR]`): #23, #27.
-Not yet done: #18 (date picker / masked input), #29 (reanimated transitions).
+Deferred (`[BEHAVIOR]`): #27 (FAB for expense form).
 
 ### Completed items
-`[x]` 1 · `[x]` 2 · `[x]` 3 · `[x]` 4 · `[x]` 5 · `[x]` 6 · `[x]` 7 · `[x]` 8 (partial) · `[x]` 9 · `[x]` 10 · `[x]` 11 · `[x]` 12 · `[x]` 13 · `[x]` 14 · `[x]` 15 · `[x]` 16 · `[x]` 17 · `[x]` 19 · `[x]` 20 · `[x]` 21 · `[x]` 22 · `[x]` 24 · `[x]` 25 · `[x]` 26 · `[x]` 28 · `[x]` 30 · `[x]` 31 · `[x]` 32
+`[x]` 1 · `[x]` 2 · `[x]` 3 · `[x]` 4 · `[x]` 5 · `[x]` 6 · `[x]` 7 · `[x]` 8 · `[x]` 9 · `[x]` 10 · `[x]` 11 · `[x]` 12 · `[x]` 13 · `[x]` 14 · `[x]` 15 · `[x]` 16 · `[x]` 17 · `[x]` 18 · `[x]` 19 · `[x]` 20 · `[x]` 21 · `[x]` 22 · `[x]` 23 · `[x]` 24 · `[x]` 25 · `[x]` 26 · `[x]` 28 · `[x]` 29 · `[x]` 30 · `[x]` 31 · `[x]` 32
