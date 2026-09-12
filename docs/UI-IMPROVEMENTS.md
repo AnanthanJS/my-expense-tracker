@@ -13,7 +13,7 @@
 
 ## Tier 1 — Visible defects
 
-### [ ] 1. `ProgressCircle` does not show progress
+### [x] 1. `ProgressCircle` does not show progress
 
 `components/ProgressCircle.tsx:37`
 
@@ -43,7 +43,7 @@ safe divisor and cap the *arc* at 100% while letting the *label* exceed it
 
 ---
 
-### [ ] 2. Nav pill highlight drifts on narrow screens
+### [x] 2. Nav pill highlight drifts on narrow screens
 
 `components/BottomNavBar.tsx:85` vs `:196`
 
@@ -67,7 +67,7 @@ widths agree by construction.
 
 ---
 
-### [ ] 3. Horizontal gutter changes between tabs
+### [x] 3. Horizontal gutter changes between tabs
 
 | Screen | Gutter | Source |
 |---|---|---|
@@ -86,7 +86,7 @@ header. Recommend 20 as the compromise, or 16 throughout for more content width.
 
 ---
 
-### [ ] 4. Bottom clearance is hardcoded and wrong per device
+### [x] 4. Bottom clearance is hardcoded and wrong per device
 
 | Location | Value |
 |---|---|
@@ -106,7 +106,7 @@ five places.
 
 ---
 
-### [ ] 5. Splash flashes the wrong color
+### [x] 5. Splash flashes the wrong color
 
 `app.json` — `splash.backgroundColor` and `android.adaptiveIcon.backgroundColor`
 are both `#0f172a` (Slate 900), which matches neither theme (`#f8fafc` light,
@@ -119,7 +119,7 @@ config allows it for the target SDK.
 
 ## Tier 2 — Design system
 
-### [ ] 6. `SPACING` exists but is bypassed
+### [x] 6. `SPACING` exists but is bypassed
 
 Raw literals dominate: `padding: 24`, `gap: 14`, `marginBottom: 30`,
 `marginBottom: 15`, `paddingVertical: 7`, and `gap: SPACING.sm + 2`
@@ -131,7 +131,7 @@ consistent by construction.
 
 ---
 
-### [ ] 7. No radius scale
+### [x] 7. No radius scale
 
 In use: **10, 12, 14, 16, 18, 20, 24, 32, 40**. Cards alone are 24
 (`SummaryCard`, `ExpenseForm`), 20 (`CategoryBreakdown`, `ExpenseList`, Settings
@@ -145,7 +145,7 @@ RADII = { sm: 12, md: 16, lg: 24, pill: 999 }
 
 ---
 
-### [ ] 8. No type scale
+### [x] 8. No type scale
 
 13 distinct font sizes: **9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28**.
 
@@ -170,7 +170,7 @@ the overline cannot drift again.
 
 ---
 
-### [ ] 9. `colors.background` used as the on-primary foreground
+### [x] 9. `colors.background` used as the on-primary foreground
 
 Every white-on-blue label — the Add button, the active nav label, the filter
 badge, Apply Filters, Save — is `color: colors.background`. It passes contrast
@@ -180,7 +180,7 @@ today by coincidence, and breaks the moment either background token moves.
 
 ---
 
-### [ ] 10. Dark surfaces are indistinguishable
+### [x] 10. Dark surfaces are indistinguishable
 
 `background #000000` → `surface #0a0a0a` → `surfaceLight #171717`.
 
@@ -193,7 +193,7 @@ the OLED feel while restoring layering.
 
 ---
 
-### [ ] 11. Shadows are single-platform
+### [x] 11. Shadows are single-platform
 
 | Component | Has | Missing | Invisible on |
 |---|---|---|---|
@@ -209,7 +209,7 @@ it in all four places.
 
 ## Tier 3 — Accessibility
 
-### [ ] 12. `textDim` fails WCAG AA
+### [x] 12. `textDim` fails WCAG AA
 
 | Context | Pair | Ratio | Required |
 |---|---|---|---|
@@ -224,7 +224,7 @@ secondary information in the app.
 
 ---
 
-### [ ] 13. Modal scrims are too heavy
+### [x] 13. Modal scrims are too heavy
 
 | File | Line | Opacity |
 |---|---|---|
@@ -241,7 +241,7 @@ rather than a layer.
 
 ---
 
-### [ ] 14. Unlabeled controls
+### [x] 14. Unlabeled controls
 
 Missing `accessibilityLabel` / `accessibilityRole`:
 
@@ -258,7 +258,7 @@ match their pattern.
 
 ---
 
-### [ ] 15. Touch target below minimum
+### [x] 15. Touch target below minimum
 
 `ExpenseList.deleteBtn` — 14px glyph + 4px padding + 8px hitSlop ≈ **38px**,
 under the 44px floor. The `RecentExpensesScreen` equivalent (18px icon, hitSlop
@@ -269,7 +269,7 @@ under the 44px floor. The `RecentExpensesScreen` equivalent (18px icon, hitSlop
 
 ---
 
-### [ ] 16. Dynamic Type breaks fixed rows
+### [x] 16. Dynamic Type breaks fixed rows
 
 `ITEM_HEIGHT` is hard-locked — 62 (`ExpenseList`) and 68
 (`RecentExpensesScreen`) — and fed to `getItemLayout`. Rows hold two text lines
@@ -281,7 +281,7 @@ sizes the metadata line clips. `itemMeta` also lacks `numberOfLines`.
 
 ---
 
-### [ ] 17. Tablet declared but not designed
+### [x] 17. Tablet declared but not designed
 
 `app.json` sets `supportsTablet: true`, yet every screen is a single `flex: 1`
 column. On iPad the month picker becomes a full-width bar, cards stretch to
@@ -310,7 +310,7 @@ fields.
 
 ---
 
-### [ ] 19. Two feedback languages in one app
+### [x] 19. Two feedback languages in one app
 
 `ExpenseForm` uses the themed global `Snackbar` via `showFeedback`.
 `RecentExpensesScreen` and `SettingsScreen` use native `Alert.alert` for the same
@@ -321,7 +321,7 @@ Keep `Alert` only for the genuinely blocking merge/replace import choice.
 
 ---
 
-### [ ] 20. "Apply Filters" does not apply anything
+### [x] 20. "Apply Filters" does not apply anything
 
 The filter modal writes directly to live filter state, so results update as you
 tap. The button only dismisses the sheet — the label promises deferred
@@ -332,7 +332,7 @@ behavior change.)
 
 ---
 
-### [ ] 21. Export / PDF / Import occupy prime real estate
+### [x] 21. Export / PDF / Import occupy prime real estate
 
 `RecentExpensesScreen` `transferRow` — three equal-weight buttons pinned above
 the list on every visit, competing with search for the top of the screen. These
@@ -342,7 +342,7 @@ are occasional utility actions.
 
 ---
 
-### [ ] 22. The empty state misleads on first run
+### [x] 22. The empty state misleads on first run
 
 `RecentExpensesScreen` always renders a magnifying glass and "No results found",
 whether the user filtered to nothing **or** has never added an expense. A new
@@ -369,7 +369,7 @@ independently.
 
 ---
 
-### [ ] 24. Category identity is inconsistent across screens
+### [x] 24. Category identity is inconsistent across screens
 
 `CATEGORY_COLORS` drives the dots in both lists and the bars in
 `CategoryBreakdown`. But `SettingsScreen.tsx:225–226` renders category tiles as a
@@ -385,7 +385,7 @@ pick one.
 
 ---
 
-### [ ] 25. Settings' Save button hides at the bottom of a long scroll
+### [x] 25. Settings' Save button hides at the bottom of a long scroll
 
 It mounts only when `hasChanges` is true, at the very end of the content. With a
 dozen categories the user edits a field at the top and gets no visible signal
@@ -397,7 +397,7 @@ in the common case.
 
 ---
 
-### [ ] 26. `SummaryCard` accepts `income` and never renders it
+### [x] 26. `SummaryCard` accepts `income` and never renders it
 
 `SummaryCard.tsx:10` declares the prop; the destructure at `:15–20` omits it.
 The derived "Savings" figure lives in a separate stat card further down — which
@@ -410,7 +410,7 @@ so the layout does not jump.
 
 ---
 
-### [ ] 27. `[BEHAVIOR]` A data-entry form sits in the middle of a dashboard
+### [x] 27. `[BEHAVIOR]` A data-entry form sits in the middle of a dashboard
 
 `ADD EXPENSE` renders between the summary and the category breakdown, splitting
 the reporting view in half. A FAB → bottom sheet is the conventional pattern and
@@ -422,7 +422,7 @@ would let Home read as a continuous dashboard.
 
 ## Tier 5 — Polish
 
-### [ ] 28. Two orphaned components
+### [x] 28. Two orphaned components
 
 `components/ExpenseList.tsx` (174 lines) and `components/SettingsModal.tsx`
 (182 lines) are imported by nothing — verified across the tree. They are older
@@ -443,7 +443,7 @@ perceived-quality gain for very little code.
 
 ---
 
-### [ ] 30. About mixes two icon systems
+### [x] 30. About mixes two icon systems
 
 Emoji (💰 📊 📅 🎯 🔍 💾 🔒 ❤️) against Tabler icons everywhere else. Emoji render
 differently per platform and do not respond to the theme.
@@ -457,7 +457,7 @@ choice, ₹ by default".
 
 ---
 
-### [ ] 31. `MainHeader` title size varies per tab
+### [x] 31. `MainHeader` title size varies per tab
 
 22px with `adjustsFontSizeToFit` + `numberOfLines={1}` means "My Expense Tracker"
 shrinks while "About" does not — the header's optical weight changes as you
@@ -467,7 +467,7 @@ swipe.
 
 ---
 
-### [ ] 32. Amount input is fixed width
+### [x] 32. Amount input is fixed width
 
 `ExpenseForm.tsx:196` — `amountInput: { width: 100 }` with no
 `adjustsFontSizeToFit`. Six-figure amounts truncate mid-entry. The field also
@@ -500,11 +500,11 @@ does. Phase 4 is presentation plus copy, with the exception noted per item.
 | 1 — Visible defects | 5 | 5 |
 | 2 — Design system | 6 | 6 |
 | 3 — Accessibility | 6 | 6 |
-| 4 — Interaction & IA | 10 | 9 |
+| 4 — Interaction & IA | 10 | 10 |
 | 5 — Polish | 5 | 5 |
-| **Total** | **32** | **31** |
+| **Total** | **32** | **32** |
 
-Deferred (`[BEHAVIOR]`): #27 (FAB for expense form).
+All 32 improvement items completed.
 
 ### Completed items
-`[x]` 1 · `[x]` 2 · `[x]` 3 · `[x]` 4 · `[x]` 5 · `[x]` 6 · `[x]` 7 · `[x]` 8 · `[x]` 9 · `[x]` 10 · `[x]` 11 · `[x]` 12 · `[x]` 13 · `[x]` 14 · `[x]` 15 · `[x]` 16 · `[x]` 17 · `[x]` 18 · `[x]` 19 · `[x]` 20 · `[x]` 21 · `[x]` 22 · `[x]` 23 · `[x]` 24 · `[x]` 25 · `[x]` 26 · `[x]` 28 · `[x]` 29 · `[x]` 30 · `[x]` 31 · `[x]` 32
+`[x]` 1 · `[x]` 2 · `[x]` 3 · `[x]` 4 · `[x]` 5 · `[x]` 6 · `[x]` 7 · `[x]` 8 · `[x]` 9 · `[x]` 10 · `[x]` 11 · `[x]` 12 · `[x]` 13 · `[x]` 14 · `[x]` 15 · `[x]` 16 · `[x]` 17 · `[x]` 18 · `[x]` 19 · `[x]` 20 · `[x]` 21 · `[x]` 22 · `[x]` 23 · `[x]` 24 · `[x]` 25 · `[x]` 26 · `[x]` 27 · `[x]` 28 · `[x]` 29 · `[x]` 30 · `[x]` 31 · `[x]` 32
