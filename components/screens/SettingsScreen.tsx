@@ -12,9 +12,10 @@ import {
 import { IconPlus, IconTrash, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
-import { FONTS, SPACING } from '../../constants/theme';
+import { FONTS, SPACING, GUTTER, SCRIM, getCategoryColor } from '../../constants/theme';
 import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 
 const CURRENCY_PRESETS = [
   { symbol: '₹', label: 'INR' },
@@ -35,19 +36,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onUnsavedChangesChange,
   onClearPendingRoute,
 }) => {
-  const { settings, updateSettings } = useApp();
+  const { settings, updateSettings, showFeedback } = useApp(); // (#19) showFeedback
   const { colors } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
-  
-  const [income, setIncome] = useState(settings.income);
-  const [budget, setBudget] = useState(settings.budget);
-  const [currency, setCurrency] = useState(settings.currency);
+  const navbarHeight = useNavbarHeight(); // (#4)
+
+  const [income, setIncome]         = useState(settings.income);
+  const [budget, setBudget]         = useState(settings.budget);
+  const [currency, setCurrency]     = useState(settings.currency);
   const [categories, setCategories] = useState(settings.categories);
-  
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+
+  const [isAddModalVisible, setIsAddModalVisible]     = useState(false);
   const [isSavePromptVisible, setIsSavePromptVisible] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [newCategoryName, setNewCategoryName]         = useState('');
+  const [isSaving, setIsSaving]                       = useState(false);
 
   useEffect(() => {
     setIncome(settings.income);
@@ -56,15 +58,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setCategories(settings.categories);
   }, [settings]);
 
-  // Detect if any changes have been made compared to global settings
-  const hasChanges = useMemo(() => {
-    return (
-      income !== settings.income ||
-      budget !== settings.budget ||
-      currency !== settings.currency ||
-      JSON.stringify(categories) !== JSON.stringify(settings.categories)
-    );
-  }, [income, budget, currency, categories, settings]);
+  const hasChanges = useMemo(() => (
+    income !== settings.income ||
+    budget !== settings.budget ||
+    currency !== settings.currency ||
+    JSON.stringify(categories) !== JSON.stringify(settings.categories)
+  ), [income, budget, currency, categories, settings]);
 
   useEffect(() => {
     onUnsavedChangesChange?.(hasChanges);
@@ -86,7 +85,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleSave = useCallback(async () => {
     if (!income || !budget) {
-      Alert.alert('Missing fields', 'Please enter both income and budget.');
+      // (#19) Route missing-fields alert through Snackbar
+      showFeedback('Please enter both income and budget.', 'error');
       return;
     }
     setIsSaving(true);
@@ -94,7 +94,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setIsSaving(false);
     setIsSavePromptVisible(false);
     continuePendingNavigation();
-  }, [income, budget, currency, categories, settings, updateSettings, continuePendingNavigation]);
+  }, [income, budget, currency, categories, settings, updateSettings, continuePendingNavigation, showFeedback]);
 
   const handleDiscardChanges = useCallback(() => {
     setIncome(settings.income);
@@ -114,7 +114,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const trimmed = newCategoryName.trim();
     if (!trimmed) return;
     if (categories.includes(trimmed)) {
-      Alert.alert('Duplicate', 'This category already exists.');
+      // (#19) Duplicate category through Snackbar
+      showFeedback('This category already exists.', 'error');
       return;
     }
     setCategories([...categories, trimmed]);
@@ -151,9 +152,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 keyboardType="decimal-pad"
                 placeholder="5000"
                 placeholderTextColor={colors.textDim}
+                accessibilityLabel="Monthly income"
               />
             </View>
-
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.textMuted }]}>Monthly Budget</Text>
               <TextInput
@@ -163,6 +164,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 keyboardType="decimal-pad"
                 placeholder="2000"
                 placeholderTextColor={colors.textDim}
+                accessibilityLabel="Monthly budget"
               />
             </View>
           </View>
@@ -178,13 +180,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 style={[
                   styles.gridItem,
                   { backgroundColor: colors.surface, borderColor: colors.surfaceLight },
-                  currency === item.symbol && { borderColor: colors.primary, backgroundColor: colors.surfaceLight }
+                  currency === item.symbol && { borderColor: colors.primary, backgroundColor: colors.surfaceLight },
                 ]}
-                onPress={() => {
-                  if (currency !== item.symbol) {
-                    setCurrency(item.symbol);
-                  }
-                }}
+                onPress={() => { if (currency !== item.symbol) setCurrency(item.symbol); }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: currency === item.symbol }}
+                accessibilityLabel={`${item.label} currency`}
               >
                 <Text style={[styles.gridSymbol, { color: currency === item.symbol ? colors.primary : colors.text }]}>
                   {item.symbol}
@@ -193,15 +194,16 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </TouchableOpacity>
             ))}
             <View style={[styles.gridItem, styles.manualCurrency, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
-               <TextInput 
-                  style={[styles.manualInput, { color: colors.text }]}
-                  value={currency}
-                  onChangeText={setCurrency}
-                  maxLength={3}
-                  placeholder="..."
-                  placeholderTextColor={colors.textDim}
-               />
-               <Text style={[styles.gridLabel, { color: colors.textDim }]}>OTHER</Text>
+              <TextInput
+                style={[styles.manualInput, { color: colors.text }]}
+                value={currency}
+                onChangeText={setCurrency}
+                maxLength={3}
+                placeholder="..."
+                placeholderTextColor={colors.textDim}
+                accessibilityLabel="Custom currency symbol"
+              />
+              <Text style={[styles.gridLabel, { color: colors.textDim }]}>OTHER</Text>
             </View>
           </View>
         </View>
@@ -210,30 +212,39 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>CATEGORIES</Text>
           <View style={styles.grid}>
-            {categories.map((cat) => (
-              <View 
-                key={cat} 
-                style={[styles.gridItem, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
-              >
-                <TouchableOpacity 
-                  style={styles.deleteIcon} 
-                  onPress={() => handleRemoveCategory(cat)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            {categories.map((cat) => {
+              // (#24) Use category color for first-letter tile
+              const catColor = getCategoryColor(cat);
+              return (
+                <View
+                  key={cat}
+                  style={[styles.gridItem, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
                 >
-                  <IconTrash size={14} color={colors.danger} />
-                </TouchableOpacity>
-                <Text style={[styles.catEmoji, { color: colors.text }]} numberOfLines={1}>
-                  {cat.substring(0, 1).toUpperCase()}
-                </Text>
-                <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={1}>
-                  {cat.toUpperCase()}
-                </Text>
-              </View>
-            ))}
-            
-            <TouchableOpacity 
+                  <TouchableOpacity
+                    style={styles.deleteIcon}
+                    onPress={() => handleRemoveCategory(cat)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityLabel={`Delete ${cat} category`}
+                    accessibilityRole="button"
+                  >
+                    <IconTrash size={14} color={colors.danger} />
+                  </TouchableOpacity>
+                  {/* (#24) First letter shown in the category's own color */}
+                  <Text style={[styles.catEmoji, { color: catColor }]} numberOfLines={1}>
+                    {cat.substring(0, 1).toUpperCase()}
+                  </Text>
+                  <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={1}>
+                    {cat.toUpperCase()}
+                  </Text>
+                </View>
+              );
+            })}
+
+            <TouchableOpacity
               style={[styles.gridItem, { backgroundColor: 'transparent', borderColor: colors.primary, borderStyle: 'dashed' }]}
               onPress={() => setIsAddModalVisible(true)}
+              accessibilityLabel="Add new category"
+              accessibilityRole="button"
             >
               <IconPlus size={24} color={colors.primary} strokeWidth={2.5} />
               <Text style={[styles.gridLabel, { color: colors.primary, marginTop: 4 }]}>ADD NEW</Text>
@@ -241,29 +252,40 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         </View>
 
-        {hasChanges && (
+        {/* (#25) Spacer so content scrolls above the sticky save bar */}
+        <View style={{ height: navbarHeight + (hasChanges ? 72 : 0) }} />
+      </ScrollView>
+
+      {/* (#25) Sticky save bar — always below ScrollView, visible whenever hasChanges */}
+      {hasChanges && (
+        <View
+          style={[
+            styles.saveBar,
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.surfaceLight,
+              paddingBottom: navbarHeight,
+            },
+          ]}
+        >
           <TouchableOpacity
             onPress={handleSave}
-            style={[
-              styles.saveButton,
-              { backgroundColor: isSaving ? colors.success : colors.primary },
-            ]}
+            style={[styles.saveButton, { backgroundColor: isSaving ? colors.success : colors.primary }]}
             activeOpacity={0.9}
             disabled={isSaving}
+            accessibilityLabel={isSaving ? 'Saving changes' : 'Save all changes'}
+            accessibilityRole="button"
           >
-            {isSaving ? (
-              <IconCheck size={20} color={colors.background} strokeWidth={3} />
-            ) : (
-              <IconAlertCircle size={20} color={colors.background} strokeWidth={2} />
-            )}
-            <Text style={[styles.saveButtonText, { color: colors.background }]}>
+            {isSaving
+              ? <IconCheck size={20} color={colors.onPrimary} strokeWidth={3} />
+              : <IconAlertCircle size={20} color={colors.onPrimary} strokeWidth={2} />
+            }
+            <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
               {isSaving ? 'Saving...' : 'Save All Changes'}
             </Text>
           </TouchableOpacity>
-        )}
-
-        <View style={styles.spacer} />
-      </ScrollView>
+        </View>
+      )}
 
       {/* Save Changes Confirmation */}
       <Modal
@@ -272,7 +294,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         animationType="fade"
         onRequestClose={closeSavePrompt}
       >
-        <View style={styles.modalOverlay}>
+        {/* (#13) SCRIM token */}
+        <View style={[styles.modalOverlay, { backgroundColor: `rgba(0,0,0,${SCRIM})` }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.savePromptIcon}>
               <IconAlertCircle size={28} color={colors.primary} strokeWidth={2.5} />
@@ -281,28 +304,29 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <Text style={[styles.savePromptText, { color: colors.textMuted }]}>
               Your settings have new changes. Would you like to save them now?
             </Text>
-
             <View style={styles.promptActions}>
               <TouchableOpacity
                 style={[styles.secondaryPromptBtn, { borderColor: colors.surfaceLight }]}
                 onPress={handleDiscardChanges}
                 disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityLabel="Discard changes"
               >
                 <Text style={[styles.secondaryPromptText, { color: colors.textMuted }]}>Discard</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.primaryPromptBtn, { backgroundColor: colors.primary }]}
                 onPress={handleSave}
                 disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityLabel={isSaving ? 'Saving' : 'Save changes'}
               >
-                <IconCheck size={18} color={colors.background} strokeWidth={3} />
-                <Text style={[styles.primaryPromptText, { color: colors.background }]}>
+                <IconCheck size={18} color={colors.onPrimary} strokeWidth={3} />
+                <Text style={[styles.primaryPromptText, { color: colors.onPrimary }]}>
                   {isSaving ? 'Saving...' : 'Save'}
                 </Text>
               </TouchableOpacity>
             </View>
-
             <TouchableOpacity onPress={closeSavePrompt} disabled={isSaving}>
               <Text style={[styles.keepEditingText, { color: colors.textDim }]}>Keep Editing</Text>
             </TouchableOpacity>
@@ -317,11 +341,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         animationType="fade"
         onRequestClose={() => setIsAddModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: `rgba(0,0,0,${SCRIM})` }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>New Category</Text>
-              <TouchableOpacity onPress={() => setIsAddModalVisible(false)}>
+              <TouchableOpacity
+                onPress={() => setIsAddModalVisible(false)}
+                accessibilityLabel="Close"
+                accessibilityRole="button"
+              >
                 <IconX size={20} color={colors.textDim} />
               </TouchableOpacity>
             </View>
@@ -332,12 +360,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               autoFocus
               value={newCategoryName}
               onChangeText={setNewCategoryName}
+              accessibilityLabel="New category name"
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.modalAddBtn, { backgroundColor: colors.primary }]}
               onPress={handleAddCategory}
+              accessibilityRole="button"
+              accessibilityLabel="Add category"
             >
-              <Text style={[styles.modalAddText, { color: colors.background }]}>Add Category</Text>
+              <Text style={[styles.modalAddText, { color: colors.onPrimary }]}>Add Category</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -349,7 +380,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 const styles = StyleSheet.create({
   mainWrapper: { flex: 1 },
   scroll: { flex: 1 },
-  content: { padding: SPACING.xl },
+  content: {
+    // (#3) GUTTER — was SPACING.xl (24), now 20
+    padding: GUTTER,
+  },
   section: { marginBottom: 30 },
   sectionTitle: {
     fontSize: 10,
@@ -398,6 +432,13 @@ const styles = StyleSheet.create({
     right: 8,
     zIndex: 1,
   },
+
+  // (#25) Sticky save bar
+  saveBar: {
+    borderTopWidth: 1,
+    paddingHorizontal: GUTTER,
+    paddingTop: SPACING.md,
+  },
   saveButton: {
     minHeight: 54,
     borderRadius: 16,
@@ -405,18 +446,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 10,
-    marginTop: 4,
   },
   saveButtonText: {
     fontSize: 16,
     fontFamily: FONTS.bold,
   },
-  spacer: { height: 120 },
 
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     padding: 30,
   },
@@ -481,14 +519,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  primaryPromptText: {
-    fontSize: 15,
-    fontFamily: FONTS.bold,
-  },
-  secondaryPromptText: {
-    fontSize: 15,
-    fontFamily: FONTS.bold,
-  },
+  primaryPromptText: { fontSize: 15, fontFamily: FONTS.bold },
+  secondaryPromptText: { fontSize: 15, fontFamily: FONTS.bold },
   keepEditingText: {
     fontSize: 13,
     fontFamily: FONTS.medium,

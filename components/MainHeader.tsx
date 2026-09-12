@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { FONTS, SPACING } from '../constants/theme';
+import { FONTS, GUTTER } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { useAppTheme } from '../hooks/useAppTheme';
 
@@ -16,7 +16,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({ title, subtitle }) => {
   return (
     <View style={[styles.header, { backgroundColor: colors.background }]}>
       <View style={styles.textContainer}>
-        <Text style={[styles.appTitle, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
+        {/* (#31) Removed adjustsFontSizeToFit — optical weight was inconsistent across tabs */}
+        <Text style={[styles.appTitle, { color: colors.primary }]} numberOfLines={1}>
           {title}
         </Text>
         <Text style={[styles.appSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
@@ -35,8 +36,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
+    // (#3) GUTTER unifies horizontal padding with all screen cards
+    paddingHorizontal: GUTTER,
+    paddingVertical: 12,
     gap: 12,
   },
   textContainer: {

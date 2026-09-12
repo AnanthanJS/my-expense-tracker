@@ -10,14 +10,14 @@ import {
 import type { LayoutChangeEvent } from 'react-native';
 import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  IconHome, 
-  IconReceipt2, 
-  IconSettings, 
+import {
+  IconHome,
+  IconReceipt2,
+  IconSettings,
   IconInfoCircle,
 } from '@tabler/icons-react-native';
 import type { IconProps } from '@tabler/icons-react-native';
-import { FONTS, SPACING } from '../constants/theme';
+import { FONTS, SPACING, ELEVATION } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 
 export type TabName = 'home' | 'recent' | 'settings' | 'about';
@@ -30,10 +30,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'home',     label: 'Home',     icon: IconHome,         routeName: 'Home' },
-  { key: 'recent',   label: 'Expenses', icon: IconReceipt2,     routeName: 'Expenses' },
-  { key: 'settings', label: 'Settings', icon: IconSettings,     routeName: 'Settings' },
-  { key: 'about',    label: 'About',    icon: IconInfoCircle,   routeName: 'About' },
+  { key: 'home',     label: 'Home',     icon: IconHome,       routeName: 'Home' },
+  { key: 'recent',   label: 'Expenses', icon: IconReceipt2,   routeName: 'Expenses' },
+  { key: 'settings', label: 'Settings', icon: IconSettings,   routeName: 'Settings' },
+  { key: 'about',    label: 'About',    icon: IconInfoCircle, routeName: 'About' },
 ];
 
 const PILL_PADDING = 8;
@@ -54,7 +54,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const currentRouteName = state.routeNames[state.index];
-  
+
   const [containerWidth, setContainerWidth] = useState(0);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -81,6 +81,9 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
   }, [currentRouteName, hasUnsavedSettings, navigation, onUnsavedSettingsNavigation, state.routes]);
 
   const numTabs = state.routes.length;
+  // (#2) Use `flex: 1` on each tab so tabs fill the pill equally — the computed
+  // tabWidth then matches the actual rendered width, eliminating highlight drift.
+  // We still need the px value for the animated highlight position.
   const usableWidth = containerWidth - (PILL_PADDING * 2) - (TAB_GAP * (numTabs - 1));
   const tabWidth = containerWidth > 0 ? usableWidth / numTabs : 0;
 
@@ -97,32 +100,33 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
 
   return (
     <View style={[styles.wrapper, { bottom: bottomOffset }]}>
-      <View 
+      <View
         style={[styles.pill, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
         onLayout={handleLayout}
         accessible={true}
         accessibilityRole="tablist"
       >
         {tabWidth > 0 && (
-          <Animated.View 
+          <Animated.View
             style={[
-              styles.animatedPill, 
-              { 
+              styles.animatedPill,
+              {
                 backgroundColor: colors.primary,
                 width: tabWidth,
-                transform: [{ translateX }]
+                transform: [{ translateX }],
               },
-            ]} 
+            ]}
           />
         )}
-        
+
         {NAV_ITEMS.map((item, index) => {
           const isActive = state.index === index;
           const Icon = item.icon;
-          
+
           return (
             <TouchableOpacity
               key={item.key}
+              // (#2) flex: 1 replaces minWidth: 78 so computed and actual tab widths agree
               style={styles.tab}
               onPress={() => handlePress(item.routeName)}
               activeOpacity={0.7}
@@ -131,17 +135,17 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
             >
-              <Icon 
-                size={22} 
-                color={isActive ? colors.background : colors.textMuted} 
+              <Icon
+                size={22}
+                color={isActive ? colors.onPrimary : colors.textMuted}
                 strokeWidth={2}
               />
               <Text style={[
-                styles.label, 
-                { 
-                  color: isActive ? colors.background : colors.textMuted,
-                  fontFamily: isActive ? FONTS.bold : FONTS.medium 
-                }
+                styles.label,
+                {
+                  color: isActive ? colors.onPrimary : colors.textMuted,
+                  fontFamily: isActive ? FONTS.bold : FONTS.medium,
+                },
               ]}>
                 {item.label}
               </Text>
@@ -171,11 +175,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     position: 'relative',
     maxWidth: '94%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 12,
+    // (#11) Unified ELEVATION.lg token (was only ios shadow props)
+    ...ELEVATION.lg,
   },
   animatedPill: {
     position: 'absolute',
@@ -186,6 +187,8 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   tab: {
+    // (#2) flex: 1 instead of minWidth: 78 — tabs share equal width by construction
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
@@ -193,10 +196,6 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     gap: 4,
     zIndex: 1,
-    minWidth: 78,
-  },
-  icon: {
-    fontSize: 18,
   },
   label: {
     fontSize: 10,

@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { useNavbarHeight } from './hooks/useNavbarHeight';
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -39,7 +40,7 @@ SplashScreen.preventAutoHideAsync();
 const Tab = createMaterialTopTabNavigator();
 
 const TAB_CONFIG = {
-  Home:     { title: 'My Expense Tracker', subtitle: 'Track spending & stay on budget' },
+  Home:     { title: 'Expense Tracker',    subtitle: 'Track spending & stay on budget' },
   Expenses: { title: 'Recent Expenses',    subtitle: 'All your transactions' },
   Settings: { title: 'Settings',           subtitle: 'Customise your experience' },
   About:    { title: 'About',              subtitle: 'App info & features' },
@@ -96,6 +97,7 @@ function AppContent() {
   const { isLoading, feedback, hideFeedback } = useApp();
   const [hasUnsavedSettings, setHasUnsavedSettings] = useState(false);
   const [pendingSettingsRoute, setPendingSettingsRoute] = useState<string | null>(null);
+  const navbarHeight = useNavbarHeight(); // (#4) replaces hardcoded marginBottom: 100
 
   const clearPendingSettingsRoute = useCallback(() => {
     setPendingSettingsRoute(null);
@@ -147,7 +149,7 @@ function AppContent() {
         duration={3000}
         style={{
           backgroundColor: feedback.type === 'error' ? colors.danger : colors.surface,
-          marginBottom: 100,
+          marginBottom: navbarHeight,
         }}
         theme={{
           colors: {

@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { FONTS, SPACING } from '../constants/theme';
+import { FONTS, SPACING, ELEVATION } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import ProgressCircle from './ProgressCircle';
 
+// (#26) Removed unused `income` prop — savings are shown in the stat row
 interface SummaryCardProps {
   spent: number;
   budget: number;
-  income: number;
   currency: string;
   month: string;
 }
@@ -19,7 +19,14 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   month,
 }) => {
   const { colors } = useAppTheme();
-  const percentage  = useMemo(() => (spent / budget) * 100, [spent, budget]);
+
+  // (#1) Clamp percentage: safe divisor guards against Infinity when budget === 0.
+  // Arc is capped at 100% inside ProgressCircle; label in stats row can exceed it.
+  const percentage = useMemo(
+    () => (budget > 0 ? (spent / budget) * 100 : 0),
+    [spent, budget],
+  );
+
   const remaining   = useMemo(() => Math.max(budget - spent, 0), [budget, spent]);
   const isOver      = spent > budget;
   const statusColor = useMemo(() => isOver ? colors.danger : colors.accent, [isOver, colors]);
@@ -29,8 +36,14 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   }, [month, spent, budget, currency, remaining, isOver]);
 
   return (
-    <View 
-      style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.surfaceLight,
+        },
+      ]}
       accessible={true}
       accessibilityLabel={a11yValue}
     >
@@ -53,9 +66,9 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
               / {currency}{budget.toLocaleString()}
             </Text>
           </View>
-          
+
           <Text style={[styles.statusLabel, { color: statusColor }]}>
-            {isOver 
+            {isOver
               ? `${currency}${(spent - budget).toLocaleString()} Over Budget`
               : `${currency}${remaining.toLocaleString()} Remaining`
             }
@@ -72,11 +85,8 @@ const styles = StyleSheet.create({
     padding: 24,
     marginBottom: SPACING.lg,
     borderWidth: 1,
-    // Subtle inner shadow effect for premium feel
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    // (#11) Unified ELEVATION.md token
+    ...ELEVATION.md,
   },
   header: {
     flexDirection: 'row',
