@@ -162,7 +162,10 @@ const AboutScreen: React.FC = () => {
             backgroundColor: calloutTint(colors.primary, isDark),
             borderColor: calloutBorder(colors.primary, isDark),
           }]}>
-            <View style={[styles.appIcon, { backgroundColor: calloutTint(colors.primary, isDark) }]}>
+            {/* A stronger tint than the card: reusing the card's own alpha
+                left the tile at 1.11:1 against it in light mode, too faint to
+                read as a tile at all. */}
+            <View style={[styles.appIcon, { backgroundColor: tint(colors.primary, '3D') }]}>
               <IconLock size={26} color={colors.primary} strokeWidth={1.8} />
             </View>
             <View style={styles.appText}>
