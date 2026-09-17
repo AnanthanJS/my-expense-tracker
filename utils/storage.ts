@@ -30,6 +30,8 @@ export interface Settings {
   hasSeenOnboarding: boolean;
   categories: string[]; // Dynamic categories
   categoryBudgets?: Record<string, number>;
+  /** Category -> group name, for the Categories & budgets screen. */
+  categoryGroups?: Record<string, string>;
   categorizationRules?: Record<string, string>;
 }
 

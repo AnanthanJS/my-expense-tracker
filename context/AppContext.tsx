@@ -38,6 +38,7 @@ type AppAction =
   | { type: 'SET_SELECTED_DATE'; date: Date }
   | { type: 'ADD_EXPENSE'; expense: Expense }
   | { type: 'EDIT_EXPENSE'; expense: Expense }
+  | { type: 'RECATEGORISE_EXPENSES'; from: string; to: string }
   | { type: 'DELETE_EXPENSE'; id: string }
   | { type: 'RESTORE_EXPENSE'; expense: Expense }
   | { type: 'RESTORE_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
@@ -60,6 +61,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, selectedDate: action.date };
     case 'ADD_EXPENSE': {
       const updatedExpenses = [action.expense, ...state.expenses];
+      saveExpenses(updatedExpenses);
+      return { ...state, expenses: updatedExpenses };
+    }
+    /**
+     * Moves every expense filed under one category to another. Used when a
+     * category is renamed or deleted — without it those expenses keep a label
+     * that no longer exists, and silently vanish from the category breakdown.
+     */
+    case 'RECATEGORISE_EXPENSES': {
+      if (action.from === action.to) return state;
+      const updatedExpenses = state.expenses.map((e) =>
+        e.category === action.from ? { ...e, category: action.to } : e,
+      );
       saveExpenses(updatedExpenses);
       return { ...state, expenses: updatedExpenses };
     }
@@ -158,6 +172,7 @@ interface AppContextType extends AppState {
   setSelectedDate: (date: Date) => void;
   addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
   editExpense: (expense: Expense) => Promise<void>;
+  recategoriseExpenses: (from: string, to: string) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   addRecurringExpense: (expense: Omit<RecurringExpense, 'id'>) => Promise<void>;
   editRecurringExpense: (expense: RecurringExpense) => Promise<void>;
@@ -248,6 +263,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [showFeedback]);
 
+  const recategoriseExpenses = useCallback(async (from: string, to: string) => {
+    dispatch({ type: 'RECATEGORISE_EXPENSES', from, to });
+  }, []);
+
   const deleteExpense = useCallback(async (id: string) => {
     try {
       // Captured before the dispatch so Undo can restore the exact record.
@@ -324,6 +343,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedDate,
         addExpense,
         editExpense,
+        recategoriseExpenses,
         deleteExpense,
         addRecurringExpense,
         editRecurringExpense,

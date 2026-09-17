@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { PieChart, BarChart } from 'react-native-gifted-charts';
 import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
-import { GLASS, SPACING, GUTTER, TEXT, RADII, getCategoryColor } from '../../constants/theme';
+import { GLASS, SPACING, GUTTER, TEXT, RADII, ELEVATION, getCategoryColor } from '../../constants/theme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import { formatCurrencyCompact } from '../../utils/formatCurrency';
 import { getMonthName } from '../../utils/storage';
@@ -249,14 +249,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   card: {
-    borderRadius: RADII.xl,
+    borderRadius: RADII.lg,
     padding: SPACING.lg,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...ELEVATION.sm,
   },
   cardTitle: {
     ...TEXT.subheading,

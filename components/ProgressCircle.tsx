@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { TEXT } from '../constants/theme';
+import { TEXT, getBudgetTone } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 
 interface ProgressCircleProps {
@@ -15,11 +15,8 @@ const STROKE_WIDTH = 7;
 const ProgressCircle: React.FC<ProgressCircleProps> = ({ percentage, size = 96 }) => {
   const { colors } = useAppTheme();
 
-  const color = useMemo(() => {
-    if (percentage > 90) return colors.danger;
-    if (percentage > 70) return colors.warning;
-    return colors.primary;
-  }, [percentage, colors]);
+  // Shared ramp, so the ring and the status beside it never disagree.
+  const color = useMemo(() => getBudgetTone(percentage, 100, colors), [percentage, colors]);
 
   const displayPercent = useMemo(() => Math.round(percentage), [percentage]);
 

@@ -1,5 +1,4 @@
 import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
-import { Platform } from 'react-native';
 import type { TextStyle, ViewStyle } from 'react-native';
 
 // ---------------------------------------------------------------------------
@@ -198,11 +197,6 @@ export const TEXT = {
   /** Meta: dates, counts, helper text. */
   caption:    { fontFamily: INTER.regular,  fontSize: 11, lineHeight: 15 },
   /**
-   * Section eyebrows. Uppercase needs positive tracking to stay legible;
-   * 0.8 at 11px is the ~1.5% the fintech typography guidance recommends.
-   */
-  overline:   { fontFamily: INTER.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 0.8 },
-  /**
    * Nav pill only — the one documented sub-11px exception. Five tabs share
    * ~54px each on a 320dp screen, so 11px would auto-shrink below 10 anyway.
    */
@@ -277,13 +271,10 @@ export const SCRIM = 0.5;
 export const SCRIM_COLOR = `rgba(0, 0, 0, ${SCRIM})`;
 
 /**
- * Blur intensity for scrims drawn as a `BlurView`. Call sites were picking
- * 40 / 80 / 100 ad hoc, so the same scrim was a different weight per modal.
- * A full-screen media viewer is the one case that legitimately wants an
- * opaque backdrop — see SCRIM_BLUR_INTENSITY_OPAQUE.
+ * Near-opaque backdrop for the full-screen receipt viewer. A photo wants the
+ * UI behind it gone, not dimmed.
  */
-export const SCRIM_BLUR_INTENSITY = Platform.select({ ios: 40, default: 80 }) ?? 80;
-export const SCRIM_BLUR_INTENSITY_OPAQUE = 100;
+export const SCRIM_COLOR_OPAQUE = 'rgba(0, 0, 0, 0.94)';
 
 // ---------------------------------------------------------------------------
 // Glass tokens — iOS-style frosted glass surfaces
@@ -328,6 +319,34 @@ export const GLASS = {
     shadow: 'rgba(0, 0, 0, 0.55)',
   },
 };
+
+// ---------------------------------------------------------------------------
+// Budget status tone
+// ---------------------------------------------------------------------------
+
+type ThemeColors = typeof COLORS.light;
+
+/**
+ * One ramp for "how is this budget doing", so the same ratio reads the same
+ * colour everywhere — the progress ring, the summary status, the category
+ * bars and the assignment meters.
+ *
+ * Deliberately only three states. Colour here is a signal, not decoration:
+ * anything under 90% stays on the neutral brand colour rather than going
+ * green, so that amber and red still mean something when they appear.
+ */
+export function getBudgetTone(spent: number, budget: number, colors: ThemeColors): string {
+  if (budget <= 0) return colors.textDim;
+  const ratio = spent / budget;
+  if (ratio > 1) return colors.danger;
+  if (ratio >= 0.9) return colors.warning;
+  return colors.primary;
+}
+
+/** Low-alpha version of a tone, for tinted pills and tracks. */
+export function tint(color: string, alpha = '1A'): string {
+  return color.length === 7 ? `${color}${alpha}` : color;
+}
 
 // ---------------------------------------------------------------------------
 // Category colors

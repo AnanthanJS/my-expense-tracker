@@ -42,17 +42,10 @@ const NAV_ITEMS: NavItem[] = [
 const PILL_PADDING = 8;
 const TAB_GAP = 4;
 
-interface BottomNavBarProps extends MaterialTopTabBarProps {
-  hasUnsavedSettings: boolean;
-  onUnsavedSettingsNavigation: (routeName: string) => void;
-}
-
-const BottomNavBar: React.FC<BottomNavBarProps> = ({
+const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
   state,
   navigation,
   position,
-  hasUnsavedSettings,
-  onUnsavedSettingsNavigation,
 }) => {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -73,15 +66,12 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
       canPreventDefault: true,
     });
 
-    if (currentRouteName === 'Settings' && routeName !== 'Settings' && hasUnsavedSettings) {
-      onUnsavedSettingsNavigation(routeName);
-      return;
-    }
-
+    // (A7) The Settings unsaved-changes interception is gone: Settings now
+    // saves as you edit, so there is nothing to lose by navigating away.
     if (currentRouteName !== routeName && !event.defaultPrevented) {
       navigation.navigate(routeName);
     }
-  }, [currentRouteName, hasUnsavedSettings, navigation, onUnsavedSettingsNavigation, state.routes]);
+  }, [currentRouteName, navigation, state.routes]);
 
   const numTabs = state.routes.length;
   // (#2) Use `flex: 1` on each tab so tabs fill the pill equally — the computed

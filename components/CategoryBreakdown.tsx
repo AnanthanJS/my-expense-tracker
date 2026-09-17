@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { SPACING, GLASS, TEXT, RADII, getCategoryColor } from '../constants/theme';
+import { SPACING, GLASS, TEXT, RADII, getCategoryColor, getBudgetTone } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';
 import { formatCurrencyCompact } from '../utils/formatCurrency';
@@ -45,7 +45,7 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
       accessible={true}
       accessibilityLabel={`Spending breakdown by category. Total spent: ${formatCurrencyCompact(totalSpent, currency)}`}
     >
-      <Text style={[styles.title, { color: colors.textDim }]}>BY CATEGORY</Text>
+      <Text style={[styles.title, { color: colors.textDim }]}>By category</Text>
       <View style={styles.list}>
         {sortedCategories.map(([category, amount]) => {
           const budgetLimit = settings.categoryBudgets?.[category];
@@ -56,11 +56,9 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
           if (budgetLimit && budgetLimit > 0) {
             percentage = (amount / budgetLimit) * 100;
             displayAmount = `${formatCurrencyCompact(amount, currency)} / ${budgetLimit.toLocaleString()}`;
-            if (percentage >= 100) {
-              barColor = colors.danger;
-            } else if (percentage >= 80) {
-              barColor = '#f59e0b'; // warning color
-            }
+            // Same ramp as the monthly budget, rather than a second
+            // hand-rolled threshold with a hardcoded amber.
+            barColor = getBudgetTone(amount, budgetLimit, colors);
           }
           const barWidth = Math.min(percentage, 100);
 
@@ -103,13 +101,13 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: RADII.xl,
+    borderRadius: RADII.lg,
     padding: SPACING.lg,
     marginBottom: SPACING.lg,
     borderWidth: 1,
   },
   title: {
-    ...TEXT.overline,
+    ...TEXT.labelSm,
     marginBottom: SPACING.lg,
   },
   list: {

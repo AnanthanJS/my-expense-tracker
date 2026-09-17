@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, Suspense, lazy, useState } from 'react';
+import React, { useEffect, Suspense, lazy, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,20 +15,22 @@ import { SafeAreaProvider, useSafeAreaInsets, initialWindowMetrics } from 'react
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  Inter_800ExtraBold,
-} from '@expo-google-fonts/inter';
-import {
-  Sora_400Regular,
-  Sora_500Medium,
-  Sora_600SemiBold,
-  Sora_700Bold,
-  Sora_800ExtraBold,
-} from '@expo-google-fonts/sora';
+/*
+  Imported per weight, not from the package root. The root index `require()`s
+  every weight including italics, and Metro cannot tree-shake that — so a root
+  import bundled all 26 TTFs (6.5 MB) when 10 (2.3 MB) are used. Fewer assets
+  is also less that can fail at load time.
+*/
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
+import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
+import { Sora_400Regular } from '@expo-google-fonts/sora/400Regular';
+import { Sora_500Medium } from '@expo-google-fonts/sora/500Medium';
+import { Sora_600SemiBold } from '@expo-google-fonts/sora/600SemiBold';
+import { Sora_700Bold } from '@expo-google-fonts/sora/700Bold';
+import { Sora_800ExtraBold } from '@expo-google-fonts/sora/800ExtraBold';
 
 import { FONTS } from './constants/theme';
 import { AppProvider, useApp } from './context/AppContext';
@@ -56,8 +58,7 @@ const TAB_CONFIG = {
   Home:      { title: 'Expense Tracker' },
   Expenses:  { title: 'Expenses' },
   Analytics: { title: 'Analytics' },
-  Settings:  { title: 'Settings', subtitle: 'Customise your experience' },
-  About:     { title: 'About',    subtitle: 'App info & features' },
+  About:     { title: 'About', subtitle: 'App info & features' },
 };
 
 const ScreenFallback = () => (
@@ -92,16 +93,14 @@ const AnalyticsWithHeader = () => (
   </Suspense>
 );
 
-interface SettingsWithHeaderProps {
-  pendingRouteName?: string | null;
-  onUnsavedChangesChange?: (hasChanges: boolean) => void;
-  onClearPendingRoute?: () => void;
-}
-
-const SettingsWithHeader: React.FC<SettingsWithHeaderProps> = (props) => (
+/*
+  No MainHeader here: the redesigned Settings screen renders its own large
+  title alongside the auto-save indicator, which is the usual pattern for a
+  settings page and is what the design calls for.
+*/
+const SettingsWithHeader = () => (
   <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Settings.title} subtitle={TAB_CONFIG.Settings.subtitle} />
-    <SettingsScreen {...props} />
+    <SettingsScreen />
   </Suspense>
 );
 
@@ -116,13 +115,7 @@ function AppContent() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { isLoading, feedback, hideFeedback } = useApp();
-  const [hasUnsavedSettings, setHasUnsavedSettings] = useState(false);
-  const [pendingSettingsRoute, setPendingSettingsRoute] = useState<string | null>(null);
   const navbarHeight = useNavbarHeight(); // (#4) replaces hardcoded marginBottom: 100
-
-  const clearPendingSettingsRoute = useCallback(() => {
-    setPendingSettingsRoute(null);
-  }, []);
 
   if (isLoading) {
     return (
@@ -136,39 +129,20 @@ function AppContent() {
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <Tab.Navigator
         tabBarPosition="bottom"
-        tabBar={(props) => (
-          <BottomNavBar
-            {...props}
-            hasUnsavedSettings={hasUnsavedSettings}
-            onUnsavedSettingsNavigation={setPendingSettingsRoute}
-          />
-        )}
+        tabBar={(props) => <BottomNavBar {...props} />}
         initialRouteName="Home"
-        screenOptions={({ route }) => ({
-          // The unsaved-settings guard lived only in BottomNavBar.handlePress,
-          // so swiping away from Settings discarded edits silently. The pager
-          // reads `swipeEnabled` from the *focused* route's options
-          // (MaterialTopTabView.js:66), so this locks the gesture only while
-          // Settings is focused and dirty — every other tab still swipes.
-          // The sticky "Save All Changes" bar is on screen whenever this is
-          // true, so the lock has a visible cause.
-          swipeEnabled: route.name === 'Settings' ? !hasUnsavedSettings : true,
+        screenOptions={{
+          // (A7) The Settings swipe guard is gone with manual saving: settings
+          // now persist as they are edited, so leaving mid-edit loses nothing.
+          swipeEnabled: true,
           lazy: true,
           lazyPlaceholder: () => <ScreenFallback />,
-        })}
+        }}
       >
         <Tab.Screen name="Home" component={HomeWithHeader} />
         <Tab.Screen name="Expenses" component={ExpensesWithHeader} />
         <Tab.Screen name="Analytics" component={AnalyticsWithHeader} />
-        <Tab.Screen name="Settings">
-          {() => (
-            <SettingsWithHeader
-              pendingRouteName={pendingSettingsRoute}
-              onUnsavedChangesChange={setHasUnsavedSettings}
-              onClearPendingRoute={clearPendingSettingsRoute}
-            />
-          )}
-        </Tab.Screen>
+        <Tab.Screen name="Settings" component={SettingsWithHeader} />
         <Tab.Screen name="About" component={AboutWithHeader} />
       </Tab.Navigator>
 
@@ -244,8 +218,15 @@ function ThemedRoot() {
   );
 }
 
+/**
+ * Longest we will hold the splash waiting for fonts. Past this we start the
+ * app anyway — a slow or broken font load should cost us the typography, not
+ * the entire app.
+ */
+const FONT_TIMEOUT_MS = 5000;
+
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     // Text (Inter) — everything that gets read
     Inter_400Regular,
     Inter_500Medium,
@@ -260,13 +241,39 @@ export default function App() {
     Sora_800ExtraBold,
   });
 
+  const [fontTimedOut, setFontTimedOut] = useState(false);
+
   useEffect(() => {
-    if (fontsLoaded) {
+    const timer = setTimeout(() => setFontTimedOut(true), FONT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  /**
+   * `useFonts` loads the whole map through a single `loadAsync`, so ONE font
+   * rejecting rejects the lot: `loaded` then stays false permanently and only
+   * `error` is set (expo-font FontHooks.js). Gating render on `loaded` alone —
+   * with the error discarded — meant any single font failure left the splash
+   * up forever with no way out and nothing logged.
+   *
+   * Proceed on success, on failure, or on timeout. React Native falls back to
+   * the system font for any family that did not load, so a failure degrades
+   * the typography instead of bricking startup.
+   */
+  const isReady = fontsLoaded || fontError !== null || fontTimedOut;
+
+  useEffect(() => {
+    if (isReady) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded]);
+  }, [isReady]);
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    if (fontError) {
+      console.warn('[fonts] load failed, continuing with system fallback:', fontError);
+    }
+  }, [fontError]);
+
+  if (!isReady) {
     return null;
   }
 

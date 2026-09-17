@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { IconPlus, IconReceipt2, IconAlertTriangle } from '@tabler/icons-react-native';
-import { SPACING, GUTTER, ELEVATION, GLASS, TEXT, RADII } from '../../constants/theme';
+import { SPACING, GUTTER, ELEVATION, GLASS, TEXT, RADII, tint } from '../../constants/theme';
 import { getMonthName } from '../../utils/storage';
 import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -123,7 +123,7 @@ const HomeScreen: React.FC = () => {
             <Animated.View
               entering={FadeIn.duration(200)}
               layout={LinearTransition.duration(200)}
-              style={[styles.alertCard, { backgroundColor: colors.danger + '14', borderColor: colors.danger + '55' }]}
+              style={[styles.alertCard, { backgroundColor: tint(colors.danger, '14'), borderColor: tint(colors.danger, '55') }]}
               accessible
               accessibilityLabel={`${overBudgetCategories.length} categor${overBudgetCategories.length === 1 ? 'y is' : 'ies are'} over budget`}
             >
@@ -207,7 +207,7 @@ const HomeScreen: React.FC = () => {
                 minimumFontScale={0.8}
                 maxFontSizeMultiplier={1.3} // (#16)
               >
-                TRANSACTIONS
+                Transactions
               </Text>
               <Text
                 style={[styles.statValue, { color: colors.text }]}
@@ -232,7 +232,7 @@ const HomeScreen: React.FC = () => {
                 minimumFontScale={0.8}
                 maxFontSizeMultiplier={1.3}
               >
-                AVG / EXPENSE
+                Avg / expense
               </Text>
               <Text
                 style={[styles.statValue, { color: colors.text }]}
@@ -257,10 +257,10 @@ const HomeScreen: React.FC = () => {
                 minimumFontScale={0.8}
                 maxFontSizeMultiplier={1.3}
               >
-                SAVINGS
+                Savings
               </Text>
               <Text
-                style={[styles.statValue, { color: colors.accent }]}
+                style={[styles.statValue, { color: savings > 0 ? colors.success : colors.textDim }]}
                 maxFontSizeMultiplier={1.3}
               >
                 {filteredExpenses.length > 0 ? formatCurrencyCompact(savings, settings.currency) : '—'}
@@ -351,8 +351,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   statLabel: {
-    // (#8) was 9px — below mobile floor of 11px
-    ...TEXT.overline,
+    ...TEXT.labelSm,
   },
   statValue: {
     ...TEXT.moneyLg,
@@ -375,7 +374,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     alignItems: 'center',
     padding: SPACING.xl,
-    borderRadius: RADII.xl,
+    borderRadius: RADII.lg,
     borderWidth: 1,
     marginBottom: SPACING.lg,
     gap: SPACING.md,

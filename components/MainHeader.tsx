@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { GUTTER, GLASS, TEXT, RADII } from '../constants/theme';
+import { GUTTER, GLASS, TEXT, RADII, SPACING } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { useAppTheme } from '../hooks/useAppTheme';
 import MonthPicker from './MonthPicker';
@@ -36,14 +36,15 @@ const MainHeader: React.FC<MainHeaderProps> = ({ title, subtitle, showMonth = fa
       worth doing, but it is a layout change, not a styling one.
     */
     <View
-      style={[styles.header, {
-        backgroundColor: glass.card,
-        borderBottomWidth: 1,
-        borderBottomColor: glass.border,
-      }]}
+      style={[styles.header, { backgroundColor: colors.background }]}
     >
       <View style={styles.textContainer}>
-        <Text style={[styles.appTitle, { color: colors.primary }]} numberOfLines={1}>
+        <Text
+          style={[styles.appTitle, { color: colors.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
           {title}
         </Text>
         {showMonth ? (
@@ -70,14 +71,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: GUTTER,
-    paddingVertical: 12,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
     gap: 12,
   },
   textContainer: {
     flex: 1,
   },
   appTitle: {
-    ...TEXT.title,
+    // Matches the Settings screen's large title so every tab opens the same way.
+    ...TEXT.display,
   },
   appSubtitle: {
     ...TEXT.labelSm,

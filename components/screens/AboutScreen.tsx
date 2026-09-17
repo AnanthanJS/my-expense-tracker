@@ -60,7 +60,7 @@ const AboutScreen: React.FC = () => {
 
         {/* Features */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>FEATURES</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>Features</Text>
           {FEATURES.map((f) => {
             const Icon = f.icon;
             return (
@@ -82,7 +82,7 @@ const AboutScreen: React.FC = () => {
 
         {/* Privacy */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>PRIVACY</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>Privacy</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.privacyRow}>
               {/* (#30) Replaced 🔒 with IconLock */}
@@ -97,7 +97,7 @@ const AboutScreen: React.FC = () => {
 
         {/* Credits */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>BUILT WITH</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>Built with</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             {['Expo & React Native', 'AsyncStorage', 'DM Sans (Google Fonts)', 'React Native Paper'].map((tech) => (
               <Text key={tech} style={[styles.techItem, { color: colors.textMuted }]}>• {tech}</Text>
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   appIconWrap: {
     width: 80,
     height: 80,
-    borderRadius: RADII.xl,
+    borderRadius: RADII.lg,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    ...TEXT.overline,
+    ...TEXT.labelSm,
     marginBottom: 12,
   },
   featureRow: {
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     ...TEXT.proseSm,
   },
   card: {
-    borderRadius: RADII.md,
+    borderRadius: RADII.lg,
     padding: 16,
     borderWidth: 1,
     gap: 6,

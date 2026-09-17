@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { SPACING, ELEVATION, GLASS, TEXT, RADII } from '../constants/theme';
+import { SPACING, ELEVATION, GLASS, TEXT, RADII, getBudgetTone, tint } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatCurrency';
 import ProgressCircle from './ProgressCircle';
@@ -28,7 +28,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
 
   const remaining   = useMemo(() => Math.max(budget - spent, 0), [budget, spent]);
   const isOver      = spent > budget;
-  const statusColor = useMemo(() => isOver ? colors.danger : colors.accent, [isOver, colors]);
+  const statusColor = useMemo(() => getBudgetTone(spent, budget, colors), [spent, budget, colors]);
 
   const a11yValue = useMemo(() => {
     return `Monthly progress for ${month}: Spent ${formatCurrencyCompact(spent, currency)} of ${formatCurrencyCompact(budget, currency)} budget. ${formatCurrencyCompact(remaining, currency)} ${isOver ? 'over budget' : 'remaining'}.`;
@@ -48,7 +48,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
       accessibilityLabel={a11yValue}
     >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textDim }]}>SUMMARY</Text>
+        <Text style={[styles.title, { color: colors.textDim }]}>Summary</Text>
         <Text style={[styles.month, { color: colors.textDim }]} numberOfLines={1}>{month}</Text>
       </View>
 
@@ -67,12 +67,16 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
             </Text>
           </View>
 
-          <Text style={[styles.statusLabel, { color: statusColor }]}>
-            {isOver
-              ? `${formatCurrency(spent - budget, currency)} Over Budget`
-              : `${formatCurrency(remaining, currency)} Remaining`
-            }
-          </Text>
+          {/* Quiet tinted pill — carries the status colour without letting
+              it flood the card. */}
+          <View style={[styles.statusPill, { backgroundColor: tint(statusColor) }]}>
+            <Text style={[styles.statusLabel, { color: statusColor }]} numberOfLines={1}>
+              {isOver
+                ? `${formatCurrency(spent - budget, currency)} over budget`
+                : `${formatCurrency(remaining, currency)} remaining`
+              }
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -81,12 +85,11 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: RADII.xl,
+    borderRadius: RADII.lg,
     padding: 24,
     marginBottom: SPACING.lg,
     borderWidth: 1,
-    // (#11) Unified ELEVATION.md token
-    ...ELEVATION.md,
+    ...ELEVATION.sm,
   },
   header: {
     flexDirection: 'row',
@@ -95,7 +98,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    ...TEXT.overline,
+    ...TEXT.labelSm,
   },
   month: {
     ...TEXT.labelSm,
@@ -123,6 +126,13 @@ const styles = StyleSheet.create({
   budgetTotal: {
     ...TEXT.money,
     marginLeft: 4,
+  },
+  statusPill: {
+    alignSelf: 'flex-start',
+    borderRadius: RADII.pill,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 5,
+    marginTop: 2,
   },
   statusLabel: {
     ...TEXT.money,

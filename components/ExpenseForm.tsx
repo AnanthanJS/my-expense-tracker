@@ -14,8 +14,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { IconPlus, IconX, IconCamera, IconPhoto, IconCheck } from '@tabler/icons-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
-import { BlurView } from 'expo-blur';
-import { TEXT, RADII, GLASS, SCRIM_BLUR_INTENSITY, getCategoryColor } from '../constants/theme';
+import { TEXT, RADII, SCRIM_COLOR, getCategoryColor } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';
 import type { Expense } from '../utils/storage';
@@ -79,8 +78,7 @@ const DATE_SHORTCUTS: { label: string; resolve: () => string }[] = [
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, editing = null, onSave }) => {
   const isEditing = Boolean(editing);
-  const { colors, isDark } = useAppTheme();
-  const glass = isDark ? GLASS.dark : GLASS.light;
+  const { colors } = useAppTheme();
   const { showFeedback, settings, updateSettings } = useApp();
 
   const [description, setDescription] = useState('');
@@ -274,26 +272,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
         behavior="padding"
         style={styles.avoidingView}
       >
-        <BlurView
-          intensity={SCRIM_BLUR_INTENSITY}
-          tint="dark"
-          style={styles.modalOverlay}
-        >
+        <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
           {/*
-            The one surface where the glass metaphor is real: it floats over
-            scrolling content inside a BlurView. It was the only such surface
-            still on hardcoded values (80/100 blur, surfaceLight border) rather
-            than the GLASS tokens written for it.
+            Solid surface, matching the recurring bill modal. A blurred sheet
+            let the list behind it show through under every form field, which
+            made long labels and the amount input harder to read than they
+            needed to be — an opaque sheet is the better call for a form.
           */}
-          <BlurView
-            intensity={glass.blur}
-            tint={isDark ? 'dark' : 'light'}
-            style={[styles.modalContent, {
-              backgroundColor: glass.floating,
-              borderColor: glass.border,
-              borderWidth: 1,
-            }]}
-          >
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
                 {isEditing ? 'Edit Expense' : 'Add Expense'}
@@ -506,8 +492,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                 </Text>
               </TouchableOpacity>
             </ScrollView>
-          </BlurView>
-        </BlurView>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );

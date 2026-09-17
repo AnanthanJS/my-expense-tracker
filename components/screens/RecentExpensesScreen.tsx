@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import type { ListRenderItemInfo } from 'react-native';
 import AnimatedRN, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
 import {
   IconSearch,
   IconX,
@@ -35,7 +34,7 @@ import {
   IconPlus,
   IconEdit,
 } from '@tabler/icons-react-native';
-import { FONTS, GUTTER, GLASS, TEXT, RADII, SCRIM_BLUR_INTENSITY, SCRIM_BLUR_INTENSITY_OPAQUE, getCategoryColor } from '../../constants/theme';
+import { FONTS, GUTTER, GLASS, TEXT, RADII, SCRIM_COLOR, SCRIM_COLOR_OPAQUE, getCategoryColor } from '../../constants/theme';
 import type { Expense, RecurringExpense } from '../../utils/storage';
 import { formatDate, toLocalISODate } from '../../utils/formatDate';
 import { getMonthName } from '../../utils/storage';
@@ -545,7 +544,7 @@ const RecentExpensesScreen: React.FC = () => {
 
       {/* Filter Modal */}
       <Modal visible={showFilters} animationType="slide" transparent onRequestClose={() => setShowFilters(false)}>
-        <BlurView intensity={SCRIM_BLUR_INTENSITY} tint="dark" style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Filter & Sort</Text>
@@ -557,7 +556,7 @@ const RecentExpensesScreen: React.FC = () => {
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>SORT BY</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>Sort by</Text>
                 <View style={styles.sortGrid}>
                   {(['newest', 'oldest', 'high-to-low', 'low-to-high'] as SortOption[]).map(opt => (
                     <TouchableOpacity key={opt}
@@ -574,7 +573,7 @@ const RecentExpensesScreen: React.FC = () => {
                 </View>
               </View>
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>PRICE RANGE</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>Price range</Text>
                 <View style={styles.rangeRow}>
                   <TextInput style={[styles.modalInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
                     placeholder="Min" placeholderTextColor={colors.textDim} keyboardType="decimal-pad" value={minPrice} onChangeText={setMinPrice} accessibilityLabel="Minimum price" />
@@ -584,7 +583,7 @@ const RecentExpensesScreen: React.FC = () => {
                 </View>
               </View>
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>CATEGORIES</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>Categories</Text>
                 <View style={styles.catGrid}>
                   {settings.categories.map(cat => {
                     const active = selectedCategories.includes(cat);
@@ -609,12 +608,12 @@ const RecentExpensesScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </BlurView>
+        </View>
       </Modal>
 
       {/* Transfer Sheet */}
       <Modal visible={showTransferSheet} animationType="slide" transparent onRequestClose={() => setShowTransferSheet(false)}>
-        <BlurView intensity={SCRIM_BLUR_INTENSITY} tint="dark" style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Export & Import</Text>
@@ -642,13 +641,13 @@ const RecentExpensesScreen: React.FC = () => {
               ))}
             </View>
           </View>
-        </BlurView>
+        </View>
       </Modal>
 
       {/* Receipt Viewer */}
       <Modal visible={!!viewingReceiptUri} transparent animationType="fade" onRequestClose={() => setViewingReceiptUri(null)}>
         {/* Full-screen photo viewer — deliberately opaque, not the standard scrim. */}
-        <BlurView intensity={SCRIM_BLUR_INTENSITY_OPAQUE} tint="dark" style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR_OPAQUE }]}>
           <TouchableOpacity
             style={{ position: 'absolute', top: 40, right: 20, zIndex: 10, padding: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADII.pill }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -659,13 +658,13 @@ const RecentExpensesScreen: React.FC = () => {
           {viewingReceiptUri && (
             <Image source={{ uri: viewingReceiptUri }} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
           )}
-        </BlurView>
+        </View>
       </Modal>
 
       {/* Recurring Form Modal */}
       <Modal visible={recurringModalVisible} transparent animationType="slide">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <BlurView intensity={SCRIM_BLUR_INTENSITY} tint="dark" style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
             <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -712,7 +711,7 @@ const RecentExpensesScreen: React.FC = () => {
                 </TouchableOpacity>
               </ScrollView>
             </View>
-          </BlurView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -743,10 +742,10 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 6,
   },
-  sectionTitle: { ...TEXT.overline },
+  sectionTitle: { ...TEXT.rowTitle },
   sectionTotal: { ...TEXT.moneySm },
   item: {
-    flexDirection: 'row', alignItems: 'center', borderRadius: RADII.md, padding: 14, marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center', borderRadius: RADII.lg, padding: 14, marginBottom: 10,
     borderWidth: 1, gap: 12, minHeight: ITEM_MIN_HEIGHT,
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 3,
   },
@@ -771,7 +770,7 @@ const styles = StyleSheet.create({
   modalTitle: { ...TEXT.heading },
   modalScroll: { paddingHorizontal: 24, paddingBottom: 40 },
   modalSection: { marginBottom: 24 },
-  modalSectionTitle: { ...TEXT.overline, marginBottom: 12 },
+  modalSectionTitle: { ...TEXT.labelSm, marginBottom: 12 },
   sortGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sortCard: { width: '48.5%', padding: 12, borderRadius: RADII.sm, borderWidth: 1, alignItems: 'center', gap: 6 },
   sortLabel: { ...TEXT.caption, fontFamily: FONTS.text.semibold },

@@ -10,10 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';
-import { TEXT, RADII, SCRIM_BLUR_INTENSITY, GLASS } from '../constants/theme';
+import { TEXT, RADII, SCRIM_COLOR, GLASS } from '../constants/theme';
 import { IconCheck, IconX } from '@tabler/icons-react-native';
 import type { RecurringExpense } from '../utils/storage';
 import { toLocalISODate } from '../utils/formatDate';
@@ -91,7 +90,7 @@ const UpcomingBills: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>UPCOMING BILLS</Text>
+      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Upcoming bills</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {upcoming.map((bill) => {
           const isOverdue = new Date(bill.nextDueDate) < new Date(new Date().setHours(0,0,0,0));
@@ -125,7 +124,7 @@ const UpcomingBills: React.FC = () => {
 
       <Modal visible={!!payingBill} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <BlurView intensity={SCRIM_BLUR_INTENSITY} tint="dark" style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
             <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Pay {payingBill?.description}</Text>
@@ -147,7 +146,7 @@ const UpcomingBills: React.FC = () => {
                 <Text style={[styles.submitText, { color: colors.onPrimary }]}>Confirm Payment</Text>
               </TouchableOpacity>
             </View>
-          </BlurView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -159,7 +158,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    ...TEXT.overline,
+    ...TEXT.labelSm,
     marginLeft: 20,
     marginBottom: 12,
   },
