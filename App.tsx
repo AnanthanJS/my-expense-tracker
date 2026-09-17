@@ -74,21 +74,21 @@ const ThemedActivityIndicator = () => {
 
 const HomeWithHeader = () => (
   <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Home.title} showMonth />
+    <MainHeader title={TAB_CONFIG.Home.title} />
     <HomeScreen />
   </Suspense>
 );
 
 const ExpensesWithHeader = () => (
   <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Expenses.title} showMonth />
+    <MainHeader title={TAB_CONFIG.Expenses.title} />
     <RecentExpensesScreen />
   </Suspense>
 );
 
 const AnalyticsWithHeader = () => (
   <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Analytics.title} showMonth />
+    <MainHeader title={TAB_CONFIG.Analytics.title} />
     <AnalyticsScreen />
   </Suspense>
 );

@@ -1,22 +1,17 @@
-import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACING } from '../constants/theme';
 
-const PILL_HEIGHT = 72; // pill paddingVertical 8*2 + icon 22 + label 14 + gap 4 ≈ 68, round up
+/** Bar content: icon 22 + gap 4 + label 13, plus SPACING.sm above and below. */
+const BAR_CONTENT_HEIGHT = 56;
 
 /**
- * Returns the minimum bottom clearance needed so scrollable content is not
- * hidden under the floating nav pill.
+ * Bottom clearance so scrollable content is not hidden behind the nav bar.
  *
- * Replaces five hardcoded height: 100 / paddingBottom: 120 literals. (#4)
+ * The bar is now flush with the bottom edge rather than floating, so the
+ * clearance is its own height plus the safe-area inset it pads itself with —
+ * there is no longer a gap underneath to account for.
  */
 export function useNavbarHeight(): number {
   const insets = useSafeAreaInsets();
-  const bottomOffset = Platform.select({
-    ios: Math.max(insets.bottom, SPACING.lg),
-    android: insets.bottom > 0 ? insets.bottom + SPACING.sm : SPACING.lg,
-    default: SPACING.lg,
-  }) ?? SPACING.lg;
-
-  return PILL_HEIGHT + bottomOffset + SPACING.sm;
+  return BAR_CONTENT_HEIGHT + Math.max(insets.bottom, SPACING.sm) + SPACING.sm;
 }

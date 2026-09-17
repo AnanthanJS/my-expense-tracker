@@ -16,6 +16,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import { formatCurrencyCompact } from '../../utils/formatCurrency';
 
+import MonthPill from '../MonthPill';
 import SummaryCard from '../SummaryCard';
 import ExpenseForm from '../ExpenseForm';
 import CategoryBreakdown from '../CategoryBreakdown';
@@ -27,6 +28,7 @@ const HomeScreen: React.FC = () => {
     expenses,
     settings,
     selectedDate,
+    setSelectedDate,
     addExpense,
     completeOnboarding,
   } = useApp();
@@ -102,6 +104,8 @@ const HomeScreen: React.FC = () => {
       >
         {/* (#17) max-width wrapper for tablet — caps at 640px centered */}
         <View style={styles.maxWidthWrapper}>
+          <MonthPill selectedDate={selectedDate} onDateChange={setSelectedDate} />
+
           {/* (#26) income prop removed from SummaryCard */}
           <SummaryCard
             spent={totalSpent}

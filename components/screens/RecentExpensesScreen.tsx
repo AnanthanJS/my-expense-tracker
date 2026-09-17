@@ -44,6 +44,7 @@ import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import ExpenseForm from '../ExpenseForm';
+import MonthPill from '../MonthPill';
 
 type ThemeColors = ReturnType<typeof useAppTheme>['colors'];
 
@@ -218,7 +219,7 @@ type SortOption = 'newest' | 'oldest' | 'high-to-low' | 'low-to-high';
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const RecentExpensesScreen: React.FC = () => {
   const {
-    expenses, recurringExpenses, settings, selectedDate, deleteExpense, editExpense, addExpense, importExpenses, showFeedback,
+    expenses, recurringExpenses, settings, selectedDate, setSelectedDate, deleteExpense, editExpense, addExpense, importExpenses, showFeedback,
     addRecurringExpense, editRecurringExpense, deleteRecurringExpense,
   } = useApp();
   const { colors, isDark } = useAppTheme();
@@ -441,6 +442,10 @@ const RecentExpensesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={{ paddingHorizontal: GUTTER }}>
+        <MonthPill selectedDate={selectedDate} onDateChange={setSelectedDate} />
+      </View>
+
       {/* Segmented Tab */}
       <View style={[styles.segRow, { paddingHorizontal: GUTTER }]}>
         <SegmentedControl

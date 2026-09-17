@@ -5,11 +5,12 @@ import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { GLASS, SPACING, GUTTER, TEXT, RADII, ELEVATION, getCategoryColor } from '../../constants/theme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
+import MonthPill from '../MonthPill';
 import { formatCurrencyCompact } from '../../utils/formatCurrency';
 import { getMonthName } from '../../utils/storage';
 
 export default function AnalyticsScreen() {
-  const { expenses, settings, selectedDate } = useApp();
+  const { expenses, settings, selectedDate, setSelectedDate } = useApp();
   const currency = settings.currency;
   const { colors, isDark } = useAppTheme();
   const navbarHeight = useNavbarHeight();
@@ -135,6 +136,8 @@ export default function AnalyticsScreen() {
       contentContainerStyle={[styles.content, { paddingBottom: navbarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
+      <MonthPill selectedDate={selectedDate} onDateChange={setSelectedDate} />
+
       {/*
         No in-screen title here — App.tsx already renders
         <MainHeader title="Analytics" subtitle="Visualise your spending" />

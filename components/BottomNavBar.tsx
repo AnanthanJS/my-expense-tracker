@@ -4,12 +4,10 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Platform,
   Animated,
 } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
-import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IconHome,
@@ -85,20 +83,23 @@ const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
     outputRange: state.routes.map((_, i) => i * (tabWidth + TAB_GAP)),
   });
 
-  const bottomOffset = Platform.select({
-    ios: Math.max(insets.bottom, SPACING.lg),
-    android: insets.bottom > 0 ? insets.bottom + SPACING.sm : SPACING.lg,
-    default: SPACING.lg,
-  });
+  const bottomOffset = Math.max(insets.bottom, SPACING.sm);
 
   const glass = isDark ? GLASS.dark : GLASS.light;
 
   return (
-    <View style={[styles.wrapper, { bottom: bottomOffset }]}>
-      <BlurView
-        intensity={glass.blur}
-        tint={isDark ? 'dark' : 'light'}
-        style={[styles.pill, { backgroundColor: glass.floating, borderColor: glass.border }]}
+    <View
+      style={[
+        styles.bar,
+        {
+          backgroundColor: colors.surface,
+          borderTopColor: glass.border,
+          paddingBottom: bottomOffset,
+        },
+      ]}
+    >
+      <View
+        style={styles.row}
         onLayout={handleLayout}
         accessible={true}
         accessibilityRole="tablist"
@@ -161,39 +162,34 @@ const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
             </TouchableOpacity>
           );
         })}
-      </BlurView>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
+  bar: {
     position: 'absolute',
     left: 0,
     right: 0,
-    alignItems: 'center',
-    pointerEvents: 'box-none',
-  },
-  pill: {
-    flexDirection: 'row',
-    borderRadius: RADII.pill,
-    paddingVertical: 8,
+    bottom: 0,
+    borderTopWidth: 1,
+    paddingTop: SPACING.sm,
     paddingHorizontal: PILL_PADDING,
+    ...ELEVATION.md,
+  },
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: TAB_GAP,
-    borderWidth: 1,
     position: 'relative',
-    maxWidth: '94%',
-    overflow: 'hidden',
-    // (#11) Unified ELEVATION.lg token (was only ios shadow props)
-    ...ELEVATION.lg,
   },
   animatedPill: {
     position: 'absolute',
-    left: PILL_PADDING,
-    top: 8,
-    bottom: 8,
-    borderRadius: RADII.pill,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: RADII.md,
     zIndex: 0,
   },
   tab: {
@@ -201,8 +197,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: RADII.pill,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADII.md,
     gap: 4,
     zIndex: 1,
   },
