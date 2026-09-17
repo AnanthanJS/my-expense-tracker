@@ -2,7 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import type { Expense, Settings } from './storage';
+import type { Expense, Settings, RecurringExpense } from './storage';
 import { formatDate } from './formatDate';
 
 interface ExpenseExportFile {
@@ -10,6 +10,7 @@ interface ExpenseExportFile {
   version: 1;
   exportedAt: string;
   expenses: Expense[];
+  recurringExpenses?: RecurringExpense[];
 }
 
 const EXPORT_VERSION = 1;
@@ -54,24 +55,46 @@ const normalizeExpense = (value: unknown): Expense | null => {
   };
 };
 
-const readExpensesFromJson = (contents: string): Expense[] => {
-  const parsed = JSON.parse(contents) as unknown;
-  const source = Array.isArray(parsed)
-    ? parsed
-    : parsed && typeof parsed === 'object' && Array.isArray((parsed as ExpenseExportFile).expenses)
-      ? (parsed as ExpenseExportFile).expenses
-      : null;
+const normalizeRecurring = (value: unknown): RecurringExpense | null => {
+  if (!value || typeof value !== 'object') return null;
+  const c = value as Partial<RecurringExpense>;
+  if (!c.description || !c.category || !c.frequency || !c.nextDueDate) return null;
+  return {
+    id: typeof c.id === 'string' && c.id ? c.id : Date.now().toString() + Math.random(),
+    description: c.description,
+    amount: Number(c.amount) || 0,
+    category: c.category,
+    frequency: c.frequency as any,
+    nextDueDate: c.nextDueDate,
+    isVariableAmount: Boolean(c.isVariableAmount),
+  };
+};
 
-  if (!source) {
+const readExpensesFromJson = (contents: string): { expenses: Expense[], recurringExpenses: RecurringExpense[] } => {
+  const parsed = JSON.parse(contents) as unknown;
+  let sourceExpenses: unknown[] | null = null;
+  let sourceRecurring: unknown[] | null = null;
+
+  if (Array.isArray(parsed)) {
+    sourceExpenses = parsed;
+  } else if (parsed && typeof parsed === 'object') {
+    const file = parsed as ExpenseExportFile;
+    sourceExpenses = Array.isArray(file.expenses) ? file.expenses : null;
+    sourceRecurring = Array.isArray(file.recurringExpenses) ? file.recurringExpenses : null;
+  }
+
+  if (!sourceExpenses) {
     throw new Error('This file does not contain an expenses array.');
   }
 
-  const expenses = source.map(normalizeExpense).filter((expense): expense is Expense => Boolean(expense));
-  if (expenses.length === 0) {
-    throw new Error('No valid expenses were found in this file.');
+  const expenses = sourceExpenses.map(normalizeExpense).filter((expense): expense is Expense => Boolean(expense));
+  const recurringExpenses = sourceRecurring ? sourceRecurring.map(normalizeRecurring).filter((r): r is RecurringExpense => Boolean(r)) : [];
+
+  if (expenses.length === 0 && recurringExpenses.length === 0) {
+    throw new Error('No valid expenses or recurring expenses were found in this file.');
   }
 
-  return expenses;
+  return { expenses, recurringExpenses };
 };
 
 const escapeHtml = (value: string) =>
@@ -134,13 +157,22 @@ const buildExpensesPdfHtml = (expenses: Expense[], settings: Settings) => {
   `;
 };
 
-export const exportExpensesAsJson = async (expenses: Expense[]) => {
+export const exportExpensesAsJson = async (expenses: Expense[], recurringExpenses: RecurringExpense[] = []) => {
   await assertCanShare();
+  const sanitizedExpenses = expenses.map((e) => {
+    const { receiptUri, ...rest } = e;
+    return {
+      ...rest,
+      hasReceipt: !!receiptUri,
+    } as unknown as Expense; // Type casting for export
+  });
+
   const file: ExpenseExportFile = {
     app: 'my-expense-tracker',
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
-    expenses,
+    expenses: sanitizedExpenses,
+    recurringExpenses,
   };
 
   const exportFile = new File(Paths.cache, getExportName('json'));
@@ -170,7 +202,7 @@ export const exportExpensesAsPdf = async (expenses: Expense[], settings: Setting
   });
 };
 
-export const pickExpensesJson = async () => {
+export const pickExpensesJson = async (): Promise<{ expenses: Expense[], recurringExpenses: RecurringExpense[] } | null> => {
   const result = await DocumentPicker.getDocumentAsync({
     type: 'application/json',
     copyToCacheDirectory: true,

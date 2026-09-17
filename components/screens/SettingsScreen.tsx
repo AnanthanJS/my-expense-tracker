@@ -8,15 +8,50 @@ import {
   ScrollView,
   Alert,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
-import { IconPlus, IconTrash, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react-native';
+import { IconPlus, IconTrash, IconCheck, IconX, IconAlertCircle, IconSun, IconMoon, IconDeviceMobile } from '@tabler/icons-react-native';
+import type { IconProps } from '@tabler/icons-react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
-import { FONTS, SPACING, GUTTER, SCRIM, getCategoryColor } from '../../constants/theme';
+import { SPACING, GUTTER, SCRIM_COLOR, TEXT, RADII, getCategoryColor } from '../../constants/theme';
 import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
+import type { ThemePreference } from '../../utils/storage';
+
+/** Gap between grid tiles, shared by the style and the width calculation. */
+const GRID_GAP = 12;
+/** Columns in the currency / category grids. */
+const GRID_COLUMNS = 3;
+/** Matches the `maxWidthWrapper` cap used by Home and About. */
+const CONTENT_MAX_WIDTH = 640;
+
+/** Stored numbers -> editable text. A 0 or missing limit shows as empty. */
+function budgetsToInputs(budgets?: Record<string, number>): Record<string, string> {
+  const out: Record<string, string> = {};
+  Object.entries(budgets || {}).forEach(([cat, value]) => {
+    if (value > 0) out[cat] = String(value);
+  });
+  return out;
+}
+
+/** Editable text -> stored numbers. Blank / zero / unparseable entries drop out. */
+function inputsToBudgets(inputs: Record<string, string>): Record<string, number> {
+  const out: Record<string, number> = {};
+  Object.entries(inputs).forEach(([cat, raw]) => {
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed) && parsed > 0) out[cat] = parsed;
+  });
+  return out;
+}
+
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: React.FC<IconProps> }[] = [
+  { value: 'system', label: 'System', icon: IconDeviceMobile },
+  { value: 'light',  label: 'Light',  icon: IconSun },
+  { value: 'dark',   label: 'Dark',   icon: IconMoon },
+];
 
 const CURRENCY_PRESETS = [
   { symbol: '₹', label: 'INR' },
@@ -41,30 +76,55 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const { colors } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const navbarHeight = useNavbarHeight(); // (#4)
+  const { width: windowWidth } = useWindowDimensions();
+
+  // Exact tile width, gaps accounted for — guarantees GRID_COLUMNS per row at
+  // every screen width instead of depending on a percentage that overflows.
+  const gridItemWidth = useMemo(() => {
+    const contentWidth = Math.min(windowWidth, CONTENT_MAX_WIDTH) - GUTTER * 2;
+    return (contentWidth - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+  }, [windowWidth]);
 
   const [income, setIncome]         = useState(settings.income);
   const [budget, setBudget]         = useState(settings.budget);
   const [currency, setCurrency]     = useState(settings.currency);
   const [categories, setCategories] = useState(settings.categories);
+  // Held as raw strings while editing. Storing numbers meant every keystroke
+  // round-tripped through parseFloat, so "12." collapsed back to "12" and a
+  // decimal point could never be typed; a stored 0 also rendered as the empty
+  // "No limit" placeholder. Parsed once, on save.
+  const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(
+    () => budgetsToInputs(settings.categoryBudgets),
+  );
 
   const [isAddModalVisible, setIsAddModalVisible]     = useState(false);
   const [isSavePromptVisible, setIsSavePromptVisible] = useState(false);
   const [newCategoryName, setNewCategoryName]         = useState('');
   const [isSaving, setIsSaving]                       = useState(false);
 
+  /**
+   * Re-sync the local edit buffer only when a *mirrored* field changes.
+   *
+   * Depending on the whole `settings` object meant any unrelated write reset
+   * the form — and Appearance writes immediately (a theme you cannot see until
+   * you press Save is not a theme picker), so it would have discarded
+   * in-progress income and budget edits.
+   */
   useEffect(() => {
     setIncome(settings.income);
     setBudget(settings.budget);
     setCurrency(settings.currency);
     setCategories(settings.categories);
-  }, [settings]);
+    setCategoryBudgets(budgetsToInputs(settings.categoryBudgets));
+  }, [settings.income, settings.budget, settings.currency, settings.categories, settings.categoryBudgets]);
 
   const hasChanges = useMemo(() => (
     income !== settings.income ||
     budget !== settings.budget ||
     currency !== settings.currency ||
-    JSON.stringify(categories) !== JSON.stringify(settings.categories)
-  ), [income, budget, currency, categories, settings]);
+    JSON.stringify(categories) !== JSON.stringify(settings.categories) ||
+    JSON.stringify(inputsToBudgets(categoryBudgets)) !== JSON.stringify(settings.categoryBudgets || {})
+  ), [income, budget, currency, categories, categoryBudgets, settings]);
 
   useEffect(() => {
     onUnsavedChangesChange?.(hasChanges);
@@ -86,22 +146,25 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleSave = useCallback(async () => {
     if (!income || !budget) {
-      // (#19) Route missing-fields alert through Snackbar
       showFeedback('Please enter both income and budget.', 'error');
       return;
     }
     setIsSaving(true);
-    await updateSettings({ ...settings, income, budget, currency, categories });
+    await updateSettings({
+      ...settings, income, budget, currency, categories,
+      categoryBudgets: inputsToBudgets(categoryBudgets),
+    });
     setIsSaving(false);
     setIsSavePromptVisible(false);
     continuePendingNavigation();
-  }, [income, budget, currency, categories, settings, updateSettings, continuePendingNavigation, showFeedback]);
+  }, [income, budget, currency, categories, categoryBudgets, settings, updateSettings, continuePendingNavigation, showFeedback]);
 
   const handleDiscardChanges = useCallback(() => {
     setIncome(settings.income);
     setBudget(settings.budget);
     setCurrency(settings.currency);
     setCategories(settings.categories);
+    setCategoryBudgets(budgetsToInputs(settings.categoryBudgets));
     setIsSavePromptVisible(false);
     continuePendingNavigation();
   }, [continuePendingNavigation, settings]);
@@ -140,9 +203,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Tablet: cap content at 640px and centre it, matching Home and About.
+            Settings was the only screen without this, so its grid (now capped
+            at CONTENT_MAX_WIDTH) would otherwise hug the left edge while the
+            cards beside it stretched the full width. */}
+        <View style={styles.maxWidthWrapper}>
         {/* Finance Configuration */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>FINANCE CONFIG</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>FINANCE CONFIG</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.textMuted }]}>Monthly Income</Text>
@@ -171,16 +239,45 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         </View>
 
+        {/* Appearance */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>APPEARANCE</Text>
+          <View style={styles.themeRow}>
+            {THEME_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const isSelected = (settings.theme ?? 'system') === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.themeCard,
+                    { backgroundColor: colors.surface, borderColor: isSelected ? colors.primary : colors.surfaceLight },
+                  ]}
+                  onPress={() => updateSettings({ ...settings, theme: option.value })}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`${option.label} theme`}
+                >
+                  <Icon size={22} color={isSelected ? colors.primary : colors.textMuted} strokeWidth={2} />
+                  <Text style={[styles.themeLabel, { color: isSelected ? colors.primary : colors.textMuted }]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Currency Grid */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>CURRENCY</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>CURRENCY</Text>
           <View style={styles.grid}>
             {CURRENCY_PRESETS.map((item) => (
               <TouchableOpacity
                 key={item.symbol}
                 style={[
                   styles.gridItem,
-                  { backgroundColor: colors.surface, borderColor: colors.surfaceLight },
+                  { width: gridItemWidth, backgroundColor: colors.surface, borderColor: colors.surfaceLight },
                   currency === item.symbol && { borderColor: colors.primary, backgroundColor: colors.surfaceLight },
                 ]}
                 onPress={() => { if (currency !== item.symbol) setCurrency(item.symbol); }}
@@ -194,7 +291,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Text style={[styles.gridLabel, { color: colors.textDim }]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
-            <View style={[styles.gridItem, styles.manualCurrency, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
+            <View style={[styles.gridItem, styles.manualCurrency, { width: gridItemWidth, backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
               <TextInput
                 style={[styles.manualInput, { color: colors.text }]}
                 value={currency}
@@ -209,9 +306,34 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         </View>
 
+        {/* Category Budgets */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>CATEGORY BUDGETS</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight, paddingVertical: 8 }]}>
+            {categories.map((cat, index) => (
+              <View key={cat} style={[styles.inputGroup, index > 0 && { borderTopWidth: 1, borderTopColor: colors.surfaceLight, paddingTop: 16, marginTop: 16 }]}>
+                <Text style={[styles.label, { color: colors.textMuted }]}>{cat}</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.surfaceLight, color: colors.text }]}
+                  value={categoryBudgets[cat] ?? ''}
+                  onChangeText={(val) => {
+                    // Keep digits and at most one decimal separator.
+                    const cleaned = val.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+                    setCategoryBudgets(prev => ({ ...prev, [cat]: cleaned }));
+                  }}
+                  keyboardType="decimal-pad"
+                  placeholder="No limit"
+                  placeholderTextColor={colors.textDim}
+                  accessibilityLabel={`Budget for ${cat}`}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+
         {/* Categories Grid */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>CATEGORIES</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>CATEGORIES</Text>
           <View style={styles.grid}>
             {categories.map((cat) => {
               // (#24) Use category color for first-letter tile
@@ -219,7 +341,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               return (
                 <View
                   key={cat}
-                  style={[styles.gridItem, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
+                  style={[styles.gridItem, { width: gridItemWidth, backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
                 >
                   <TouchableOpacity
                     style={styles.deleteIcon}
@@ -242,7 +364,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             })}
 
             <TouchableOpacity
-              style={[styles.gridItem, { backgroundColor: 'transparent', borderColor: colors.primary, borderStyle: 'dashed' }]}
+              style={[styles.gridItem, { width: gridItemWidth, backgroundColor: 'transparent', borderColor: colors.primary, borderStyle: 'dashed' }]}
               onPress={() => setIsAddModalVisible(true)}
               accessibilityLabel="Add new category"
               accessibilityRole="button"
@@ -255,6 +377,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
         {/* (#25) Spacer so content scrolls above the sticky save bar */}
         <View style={{ height: navbarHeight + (hasChanges ? 72 : 0) }} />
+        </View>
       </ScrollView>
 
       {/* (#25, #29) Sticky save bar — animates smoothly on mount/unmount */}
@@ -273,7 +396,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         >
           <TouchableOpacity
             onPress={handleSave}
-            style={[styles.saveButton, { backgroundColor: isSaving ? colors.success : colors.primary }]}
+            style={[styles.saveButton, styles.maxWidthWrapper, { backgroundColor: isSaving ? colors.success : colors.primary }]}
             activeOpacity={0.9}
             disabled={isSaving}
             accessibilityLabel={isSaving ? 'Saving changes' : 'Save all changes'}
@@ -298,7 +421,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         onRequestClose={closeSavePrompt}
       >
         {/* (#13) SCRIM token */}
-        <View style={[styles.modalOverlay, { backgroundColor: `rgba(0,0,0,${SCRIM})` }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.savePromptIcon}>
               <IconAlertCircle size={28} color={colors.primary} strokeWidth={2.5} />
@@ -344,7 +467,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         animationType="fade"
         onRequestClose={() => setIsAddModalVisible(false)}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: `rgba(0,0,0,${SCRIM})` }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>New Category</Text>
@@ -383,52 +506,71 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 const styles = StyleSheet.create({
   mainWrapper: { flex: 1 },
   scroll: { flex: 1 },
+  maxWidthWrapper: {
+    maxWidth: CONTENT_MAX_WIDTH,
+    width: '100%',
+    alignSelf: 'center',
+  },
   content: {
     // (#3) GUTTER — was SPACING.xl (24), now 20
     padding: GUTTER,
   },
   section: { marginBottom: 30 },
   sectionTitle: {
-    fontSize: 10,
-    fontFamily: FONTS.bold,
-    letterSpacing: 1.5,
+    ...TEXT.overline,
     marginBottom: 16,
   },
   card: {
-    borderRadius: 20,
+    borderRadius: RADII.lg,
     padding: 20,
     borderWidth: 1,
     gap: 16,
   },
   inputGroup: { gap: 6 },
-  label: { fontSize: 12, fontFamily: FONTS.medium },
+  label: { ...TEXT.labelSm },
   input: {
-    borderRadius: 12,
+    borderRadius: RADII.sm,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
-    fontFamily: FONTS.regular,
+    ...TEXT.moneyLg,
   },
+  themeRow: {
+    flexDirection: 'row',
+    gap: GRID_GAP,
+  },
+  themeCard: {
+    flex: 1,
+    minHeight: 72,
+    borderRadius: RADII.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  themeLabel: { ...TEXT.labelSm },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: GRID_GAP,
   },
   gridItem: {
-    width: '31%',
+    // Width is injected at render time — see `gridItemWidth`. A percentage
+    // basis cannot work here: 3 × 31% + 2 × 12px gap exceeds 100% on any
+    // screen narrower than ~370dp, so the grid silently fell back to two
+    // columns on most phones and three on a Pixel.
     aspectRatio: 1,
-    borderRadius: 16,
+    borderRadius: RADII.md,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 10,
     position: 'relative',
   },
-  gridSymbol: { fontSize: 24, fontFamily: FONTS.bold, marginBottom: 2 },
-  gridLabel: { fontSize: 9, fontFamily: FONTS.bold, letterSpacing: 0.5 },
+  gridSymbol: { ...TEXT.title, marginBottom: 2 },
+  gridLabel: { ...TEXT.overline, letterSpacing: 0.5 },
   manualCurrency: { overflow: 'hidden' },
-  manualInput: { fontSize: 18, fontFamily: FONTS.bold, textAlign: 'center', width: '100%' },
-  catEmoji: { fontSize: 22, fontFamily: FONTS.bold, marginBottom: 4 },
+  manualInput: { ...TEXT.subheading, textAlign: 'center', width: '100%' },
+  catEmoji: { ...TEXT.title, marginBottom: 4 },
   deleteIcon: {
     position: 'absolute',
     top: 8,
@@ -444,15 +586,14 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     minHeight: 54,
-    borderRadius: 16,
+    borderRadius: RADII.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 10,
   },
   saveButtonText: {
-    fontSize: 16,
-    fontFamily: FONTS.bold,
+    ...TEXT.button,
   },
 
   // Modal
@@ -462,7 +603,7 @@ const styles = StyleSheet.create({
     padding: 30,
   },
   modalContent: {
-    borderRadius: 24,
+    borderRadius: RADII.xl,
     padding: 24,
     borderWidth: 1,
     gap: 20,
@@ -472,33 +613,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  modalTitle: { fontSize: 18, fontFamily: FONTS.bold },
+  modalTitle: { ...TEXT.subheading },
   modalInput: {
-    borderRadius: 12,
+    borderRadius: RADII.sm,
     padding: 16,
-    fontSize: 16,
-    fontFamily: FONTS.regular,
+    ...TEXT.bodyLg,
   },
   modalAddBtn: {
-    paddingVertical: 14,
-    borderRadius: 12,
+    minHeight: 48,
+    justifyContent: 'center',
+    borderRadius: RADII.sm,
     alignItems: 'center',
   },
-  modalAddText: { fontSize: 16, fontFamily: FONTS.bold },
+  modalAddText: { ...TEXT.button },
   savePromptIcon: {
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
   },
   savePromptTitle: {
-    fontSize: 20,
-    fontFamily: FONTS.bold,
+    ...TEXT.heading,
     textAlign: 'center',
   },
   savePromptText: {
-    fontSize: 14,
-    fontFamily: FONTS.regular,
-    lineHeight: 20,
+    ...TEXT.prose,
     textAlign: 'center',
   },
   promptActions: {
@@ -508,7 +646,7 @@ const styles = StyleSheet.create({
   primaryPromptBtn: {
     flex: 1,
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: RADII.sm,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -517,17 +655,19 @@ const styles = StyleSheet.create({
   secondaryPromptBtn: {
     flex: 1,
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: RADII.sm,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
-  primaryPromptText: { fontSize: 15, fontFamily: FONTS.bold },
-  secondaryPromptText: { fontSize: 15, fontFamily: FONTS.bold },
+  primaryPromptText: { ...TEXT.button },
+  secondaryPromptText: { ...TEXT.button },
   keepEditingText: {
-    fontSize: 13,
-    fontFamily: FONTS.medium,
+    ...TEXT.label,
     textAlign: 'center',
+    minHeight: 44,
+    textAlignVertical: 'center',
+    paddingTop: 12,
   },
 });
 

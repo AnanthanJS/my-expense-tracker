@@ -17,7 +17,7 @@ import {
 } from '@tabler/icons-react-native';
 import type { IconProps } from '@tabler/icons-react-native';
 import appConfig from '../../app.json';
-import { FONTS, SPACING, GUTTER } from '../../constants/theme';
+import { GUTTER, TEXT, RADII, ELEVATION } from '../../constants/theme';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 
@@ -60,7 +60,7 @@ const AboutScreen: React.FC = () => {
 
         {/* Features */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>FEATURES</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>FEATURES</Text>
           {FEATURES.map((f) => {
             const Icon = f.icon;
             return (
@@ -82,7 +82,7 @@ const AboutScreen: React.FC = () => {
 
         {/* Privacy */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PRIVACY</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>PRIVACY</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.privacyRow}>
               {/* (#30) Replaced 🔒 with IconLock */}
@@ -97,7 +97,7 @@ const AboutScreen: React.FC = () => {
 
         {/* Credits */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>BUILT WITH</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>BUILT WITH</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             {['Expo & React Native', 'AsyncStorage', 'DM Sans (Google Fonts)', 'React Native Paper'].map((tech) => (
               <Text key={tech} style={[styles.techItem, { color: colors.textMuted }]}>• {tech}</Text>
@@ -137,48 +137,38 @@ const styles = StyleSheet.create({
   appIconWrap: {
     width: 80,
     height: 80,
-    borderRadius: 24,
+    borderRadius: RADII.xl,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
-    // (#11) ELEVATION on iOS was already elevation: 8; now consistent via inline for About only
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
+    // (#11) was a hand-rolled copy of ELEVATION.md
+    ...ELEVATION.md,
   },
   appName: {
-    fontSize: 24,
-    fontFamily: FONTS.bold,
+    ...TEXT.title,
     marginBottom: 4,
   },
   appVersion: {
-    fontSize: 12,
-    fontFamily: FONTS.regular,
+    ...TEXT.caption,
     marginBottom: 10,
   },
   tagline: {
-    fontSize: 14,
-    fontFamily: FONTS.regular,
+    ...TEXT.prose,
     textAlign: 'center',
-    lineHeight: 20,
   },
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 10,
-    fontFamily: FONTS.bold,
-    letterSpacing: 1.5,
+    ...TEXT.overline,
     marginBottom: 12,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 14,
-    borderRadius: 14,
+    borderRadius: RADII.md,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
@@ -186,24 +176,21 @@ const styles = StyleSheet.create({
   featureIconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: RADII.sm,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   featureText: { flex: 1 },
   featureTitle: {
-    fontSize: 14,
-    fontFamily: FONTS.bold,
+    ...TEXT.rowTitle,
     marginBottom: 2,
   },
   featureDesc: {
-    fontSize: 12,
-    fontFamily: FONTS.regular,
-    lineHeight: 18,
+    ...TEXT.proseSm,
   },
   card: {
-    borderRadius: 14,
+    borderRadius: RADII.md,
     padding: 16,
     borderWidth: 1,
     gap: 6,
@@ -215,13 +202,10 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     flex: 1,
-    fontSize: 13,
-    fontFamily: FONTS.regular,
-    lineHeight: 20,
+    ...TEXT.proseSm,
   },
   techItem: {
-    fontSize: 13,
-    fontFamily: FONTS.regular,
+    ...TEXT.proseSm,
     lineHeight: 22,
   },
   footer: {
@@ -233,8 +217,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   footerText: {
-    fontSize: 12,
-    fontFamily: FONTS.regular,
+    ...TEXT.caption,
   },
 });
 

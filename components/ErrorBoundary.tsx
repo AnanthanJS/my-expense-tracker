@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FONTS, SPACING } from '../constants/theme';
+import { SPACING, TEXT, RADII } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 
 type ThemeColors = ReturnType<typeof useAppTheme>['colors'];
@@ -69,30 +69,28 @@ const styles = StyleSheet.create({
     padding: SPACING.xxl,
   },
   emoji: {
+    // Decorative illustration, not type — deliberately off the TYPE scale.
     fontSize: 64,
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
-    fontFamily: FONTS.bold,
+    ...TEXT.title,
     marginBottom: 10,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    fontFamily: FONTS.regular,
+    ...TEXT.proseLg,
     textAlign: 'center',
     marginBottom: 30,
-    lineHeight: 24,
   },
   button: {
     paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 12,
+    minHeight: 48,
+    justifyContent: 'center',
+    borderRadius: RADII.sm,
   },
   buttonText: {
-    fontFamily: FONTS.bold,
-    fontSize: 16,
+    ...TEXT.button,
   },
 });
 

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { FONTS } from '../constants/theme';
+import { TEXT } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 
 interface ProgressCircleProps {
@@ -88,8 +88,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    fontSize: 18,
-    fontFamily: FONTS.bold,
+    ...TEXT.moneyRing,
   },
 });
 

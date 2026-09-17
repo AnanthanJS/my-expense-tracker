@@ -16,9 +16,10 @@ import {
   IconFilter,
   IconFileExport,
   IconSettings,
+  IconChartPie,
 } from '@tabler/icons-react-native';
 import type { IconProps } from '@tabler/icons-react-native';
-import { FONTS } from '../constants/theme';
+import { TEXT, RADII, SCRIM_COLOR } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 
 interface Step {
@@ -35,13 +36,18 @@ const STEPS: Step[] = [
   },
   {
     title: 'Move Between Tabs',
-    description: 'Use the bottom tabs or swipe left and right to move between Home, Expenses, Settings, and About.',
+    description: 'Use the bottom tabs or swipe left and right to move between Home, Expenses, Analytics, Settings, and About.',
     icon: IconSwipe,
   },
   {
     title: 'Add and Review',
     description: 'Add expenses on Home, switch months, monitor your budget, and see category breakdowns automatically.',
     icon: IconPlus,
+  },
+  {
+    title: 'See the Trends',
+    description: 'Analytics turns your spending into a category donut and a last-7-days bar chart, so patterns are obvious at a glance.',
+    icon: IconChartPie,
   },
   {
     title: 'Search and Filter',
@@ -55,7 +61,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Personalise Settings',
-    description: 'Set income, budget, currency, and categories. Save changes when ready; if you leave with unsaved edits, ZarcZ will ask first.',
+    description: 'Set income, budget, currency, and categories. Save changes when ready; if you leave with unsaved edits, the app will ask first.',
     icon: IconSettings,
   },
 ];
@@ -124,13 +130,13 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete }
               accessibilityLabel={currentStep === STEPS.length - 1 ? 'Finish guide' : 'Next step'}
               accessibilityRole="button"
             >
-              <Text style={[styles.nextText, { color: colors.background }]}>
+              <Text style={[styles.nextText, { color: colors.onPrimary }]}>
                 {currentStep === STEPS.length - 1 ? 'Get Started' : 'Next'}
               </Text>
               {currentStep === STEPS.length - 1 ? (
-                <IconCheck size={20} color={colors.background} strokeWidth={2.5} style={{ marginLeft: 8 }} />
+                <IconCheck size={20} color={colors.onPrimary} strokeWidth={2.5} style={{ marginLeft: 8 }} />
               ) : (
-                <IconArrowRight size={20} color={colors.background} strokeWidth={2.5} style={{ marginLeft: 8 }} />
+                <IconArrowRight size={20} color={colors.onPrimary} strokeWidth={2.5} style={{ marginLeft: 8 }} />
               )}
             </TouchableOpacity>
           </View>
@@ -143,12 +149,12 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete }
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    backgroundColor: SCRIM_COLOR,
     justifyContent: 'center',
     padding: 24,
   },
   container: {
-    borderRadius: 32,
+    borderRadius: RADII.xxl,
     padding: 32,
     borderWidth: 1,
     alignItems: 'center',
@@ -161,7 +167,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     height: 4,
     width: 100,
-    borderRadius: 2,
+    borderRadius: RADII.pill,
     marginBottom: 40,
     overflow: 'hidden',
   },
@@ -175,22 +181,19 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: RADII.pill,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
   },
   title: {
-    fontSize: 24,
-    fontFamily: FONTS.bold,
+    ...TEXT.title,
     textAlign: 'center',
     marginBottom: 16,
   },
   description: {
-    fontSize: 16,
-    fontFamily: FONTS.regular,
+    ...TEXT.proseLg,
     textAlign: 'center',
-    lineHeight: 24,
     paddingHorizontal: 10,
   },
   footer: {
@@ -200,24 +203,26 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   skipBtn: {
-    padding: 12,
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   skipText: {
-    fontSize: 14,
-    fontFamily: FONTS.medium,
+    ...TEXT.buttonSm,
   },
   nextBtn: {
     paddingHorizontal: 24,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: RADII.md,
     minWidth: 140,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextText: {
-    fontSize: 16,
-    fontFamily: FONTS.bold,
+    ...TEXT.button,
   },
 });
 

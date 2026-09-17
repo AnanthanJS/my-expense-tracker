@@ -14,12 +14,21 @@ import { Provider as PaperProvider, Snackbar } from 'react-native-paper';
 import { SafeAreaProvider, useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 import {
-  useFonts,
-  DMSans_400Regular,
-  DMSans_500Medium,
-  DMSans_700Bold,
-} from '@expo-google-fonts/dm-sans';
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from '@expo-google-fonts/inter';
+import {
+  Sora_400Regular,
+  Sora_500Medium,
+  Sora_600SemiBold,
+  Sora_700Bold,
+  Sora_800ExtraBold,
+} from '@expo-google-fonts/sora';
 
 import { FONTS } from './constants/theme';
 import { AppProvider, useApp } from './context/AppContext';
@@ -39,11 +48,16 @@ SplashScreen.preventAutoHideAsync();
 
 const Tab = createMaterialTopTabNavigator();
 
+const AnalyticsScreen      = lazy(() => import('./components/screens/AnalyticsScreen'));
+
+// (C1) The three data screens show the selected month in the header instead
+// of a static strapline; only Settings and About keep a subtitle.
 const TAB_CONFIG = {
-  Home:     { title: 'Expense Tracker',    subtitle: 'Track spending & stay on budget' },
-  Expenses: { title: 'Recent Expenses',    subtitle: 'All your transactions' },
-  Settings: { title: 'Settings',           subtitle: 'Customise your experience' },
-  About:    { title: 'About',              subtitle: 'App info & features' },
+  Home:      { title: 'Expense Tracker' },
+  Expenses:  { title: 'Expenses' },
+  Analytics: { title: 'Analytics' },
+  Settings:  { title: 'Settings', subtitle: 'Customise your experience' },
+  About:     { title: 'About',    subtitle: 'App info & features' },
 };
 
 const ScreenFallback = () => (
@@ -59,15 +73,22 @@ const ThemedActivityIndicator = () => {
 
 const HomeWithHeader = () => (
   <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Home.title} subtitle={TAB_CONFIG.Home.subtitle} />
+    <MainHeader title={TAB_CONFIG.Home.title} showMonth />
     <HomeScreen />
   </Suspense>
 );
 
 const ExpensesWithHeader = () => (
   <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.Expenses.title} subtitle={TAB_CONFIG.Expenses.subtitle} />
+    <MainHeader title={TAB_CONFIG.Expenses.title} showMonth />
     <RecentExpensesScreen />
+  </Suspense>
+);
+
+const AnalyticsWithHeader = () => (
+  <Suspense fallback={<ScreenFallback />}>
+    <MainHeader title={TAB_CONFIG.Analytics.title} showMonth />
+    <AnalyticsScreen />
   </Suspense>
 );
 
@@ -123,14 +144,22 @@ function AppContent() {
           />
         )}
         initialRouteName="Home"
-        screenOptions={{
-          swipeEnabled: true,
+        screenOptions={({ route }) => ({
+          // The unsaved-settings guard lived only in BottomNavBar.handlePress,
+          // so swiping away from Settings discarded edits silently. The pager
+          // reads `swipeEnabled` from the *focused* route's options
+          // (MaterialTopTabView.js:66), so this locks the gesture only while
+          // Settings is focused and dirty — every other tab still swipes.
+          // The sticky "Save All Changes" bar is on screen whenever this is
+          // true, so the lock has a visible cause.
+          swipeEnabled: route.name === 'Settings' ? !hasUnsavedSettings : true,
           lazy: true,
           lazyPlaceholder: () => <ScreenFallback />,
-        }}
+        })}
       >
         <Tab.Screen name="Home" component={HomeWithHeader} />
         <Tab.Screen name="Expenses" component={ExpensesWithHeader} />
+        <Tab.Screen name="Analytics" component={AnalyticsWithHeader} />
         <Tab.Screen name="Settings">
           {() => (
             <SettingsWithHeader
@@ -146,7 +175,7 @@ function AppContent() {
       <Snackbar
         visible={feedback.visible}
         onDismiss={hideFeedback}
-        duration={3000}
+        duration={feedback.onUndo ? 5000 : 3000}
         style={{
           backgroundColor: feedback.type === 'error' ? colors.danger : colors.surface,
           marginBottom: navbarHeight,
@@ -157,7 +186,13 @@ function AppContent() {
             inversePrimary: colors.primary,
           },
         }}
-        action={{
+        action={feedback.onUndo ? {
+          label: 'Undo',
+          onPress: () => {
+            feedback.onUndo?.();
+            hideFeedback();
+          },
+        } : {
           label: 'Dismiss',
           onPress: hideFeedback,
         }}
@@ -168,14 +203,62 @@ function AppContent() {
   );
 }
 
+/**
+ * Everything theme-aware lives in here, inside AppProvider — the theme now
+ * depends on a persisted setting, so the provider has to be above it.
+ */
+function ThemedRoot() {
+  const { isDark, colors, paperTheme } = useAppTheme();
+
+  return (
+    <PaperProvider theme={paperTheme}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor="transparent"
+          translucent
+        />
+        <NavigationContainer theme={{
+          dark: isDark,
+          colors: {
+            primary: colors.primary,
+            background: colors.background,
+            card: colors.surface,
+            text: colors.text,
+            border: colors.surfaceLight,
+            notification: colors.accent,
+          },
+          fonts: Platform.select({
+            default: {
+              regular: { fontFamily: FONTS.text.regular, fontWeight: '400' },
+              medium: { fontFamily: FONTS.text.medium, fontWeight: '500' },
+              bold: { fontFamily: FONTS.text.bold, fontWeight: '700' },
+              heavy: { fontFamily: FONTS.text.extrabold, fontWeight: '800' },
+            }
+          })
+        }}>
+          <AppContent />
+        </NavigationContainer>
+      </View>
+    </PaperProvider>
+  );
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_700Bold,
+    // Text (Inter) — everything that gets read
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+    // Display (Sora) — titles and hero numbers
+    Sora_400Regular,
+    Sora_500Medium,
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Sora_800ExtraBold,
   });
-
-  const { isDark, colors, paperTheme } = useAppTheme();
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -191,38 +274,9 @@ export default function App() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ErrorBoundary>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <PaperProvider theme={paperTheme}>
-            <AppProvider>
-              <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <StatusBar 
-                  barStyle={isDark ? 'light-content' : 'dark-content'} 
-                  backgroundColor="transparent"
-                  translucent
-                />
-                <NavigationContainer theme={{
-                  dark: isDark,
-                  colors: {
-                    primary: colors.primary,
-                    background: colors.background,
-                    card: colors.surface,
-                    text: colors.text,
-                    border: colors.surfaceLight,
-                    notification: colors.accent,
-                  },
-                  fonts: Platform.select({
-                    default: {
-                      regular: { fontFamily: FONTS.regular, fontWeight: '400' },
-                      medium: { fontFamily: FONTS.medium, fontWeight: '500' },
-                      bold: { fontFamily: FONTS.bold, fontWeight: '700' },
-                      heavy: { fontFamily: FONTS.bold, fontWeight: '900' },
-                    }
-                  })
-                }}>
-                  <AppContent />
-                </NavigationContainer>
-              </View>
-            </AppProvider>
-          </PaperProvider>
+          <AppProvider>
+            <ThemedRoot />
+          </AppProvider>
         </GestureHandlerRootView>
       </ErrorBoundary>
     </SafeAreaProvider>

@@ -1,33 +1,53 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { 
   defaultSettings, 
   loadExpenses, 
   saveExpenses, 
   loadSettings, 
-  saveSettings 
+  saveSettings,
+  loadRecurringExpenses,
+  saveRecurringExpenses
 } from '../utils/storage';
-import type { Expense, Settings } from '../utils/storage';
+import type { Expense, Settings, RecurringExpense } from '../utils/storage';
 
 // 1. Define State Shape
 interface AppState {
   expenses: Expense[];
+  recurringExpenses: RecurringExpense[];
   settings: Settings;
   selectedDate: Date;
   isLoading: boolean;
-  feedback: { message: string; visible: boolean; type: 'success' | 'error' };
+  feedback: {
+    message: string;
+    visible: boolean;
+    type: 'success' | 'error';
+    /**
+     * (C4) Optional undo handler. Deleting is now optimistic with an Undo in
+     * the Snackbar instead of an up-front Alert: the common case (a delete the
+     * user meant) costs no taps, and the rare case stays recoverable — which a
+     * confirm dialog never made it, once confirmed.
+     */
+    onUndo?: () => void;
+  };
 }
 
 // 2. Define Action Types
 type AppAction =
-  | { type: 'SET_INITIAL_DATA'; expenses: Expense[]; settings: Settings }
+  | { type: 'SET_INITIAL_DATA'; expenses: Expense[]; settings: Settings; recurringExpenses: RecurringExpense[] }
   | { type: 'SET_SELECTED_DATE'; date: Date }
   | { type: 'ADD_EXPENSE'; expense: Expense }
+  | { type: 'EDIT_EXPENSE'; expense: Expense }
   | { type: 'DELETE_EXPENSE'; id: string }
-  | { type: 'IMPORT_EXPENSES'; expenses: Expense[]; mode: 'merge' | 'replace' }
+  | { type: 'RESTORE_EXPENSE'; expense: Expense }
+  | { type: 'RESTORE_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
+  | { type: 'ADD_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
+  | { type: 'EDIT_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
+  | { type: 'DELETE_RECURRING_EXPENSE'; id: string }
+  | { type: 'IMPORT_EXPENSES'; expenses: Expense[]; recurringExpenses?: RecurringExpense[]; mode: 'merge' | 'replace' }
   | { type: 'UPDATE_SETTINGS'; settings: Settings }
   | { type: 'SET_LOADING'; isLoading: boolean }
-  | { type: 'SHOW_FEEDBACK'; message: string; feedbackType: 'success' | 'error' }
+  | { type: 'SHOW_FEEDBACK'; message: string; feedbackType: 'success' | 'error'; onUndo?: () => void }
   | { type: 'HIDE_FEEDBACK' }
   | { type: 'COMPLETE_ONBOARDING' };
 
@@ -35,11 +55,18 @@ type AppAction =
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_INITIAL_DATA':
-      return { ...state, expenses: action.expenses, settings: action.settings, isLoading: false };
+      return { ...state, expenses: action.expenses, recurringExpenses: action.recurringExpenses, settings: action.settings, isLoading: false };
     case 'SET_SELECTED_DATE':
       return { ...state, selectedDate: action.date };
     case 'ADD_EXPENSE': {
       const updatedExpenses = [action.expense, ...state.expenses];
+      saveExpenses(updatedExpenses);
+      return { ...state, expenses: updatedExpenses };
+    }
+    case 'EDIT_EXPENSE': {
+      const updatedExpenses = state.expenses
+        .map((e) => (e.id === action.expense.id ? action.expense : e))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       saveExpenses(updatedExpenses);
       return { ...state, expenses: updatedExpenses };
     }
@@ -48,21 +75,56 @@ function appReducer(state: AppState, action: AppAction): AppState {
       saveExpenses(updatedExpenses);
       return { ...state, expenses: updatedExpenses };
     }
+    case 'ADD_RECURRING_EXPENSE': {
+      const updated = [...state.recurringExpenses, action.recurringExpense];
+      saveRecurringExpenses(updated);
+      return { ...state, recurringExpenses: updated };
+    }
+    case 'EDIT_RECURRING_EXPENSE': {
+      const updated = state.recurringExpenses.map(e => e.id === action.recurringExpense.id ? action.recurringExpense : e);
+      saveRecurringExpenses(updated);
+      return { ...state, recurringExpenses: updated };
+    }
+    case 'RESTORE_EXPENSE': {
+      const updated = [action.expense, ...state.expenses]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      saveExpenses(updated);
+      return { ...state, expenses: updated };
+    }
+    case 'RESTORE_RECURRING_EXPENSE': {
+      const updated = [...state.recurringExpenses, action.recurringExpense];
+      saveRecurringExpenses(updated);
+      return { ...state, recurringExpenses: updated };
+    }
+    case 'DELETE_RECURRING_EXPENSE': {
+      const updated = state.recurringExpenses.filter((e) => e.id !== action.id);
+      saveRecurringExpenses(updated);
+      return { ...state, recurringExpenses: updated };
+    }
     case 'IMPORT_EXPENSES': {
       const seenIds = new Set<string>();
-      const normalizeIds = (expenses: Expense[]) => expenses.map((expense, index) => {
-        const nextId = expense.id && !seenIds.has(expense.id)
-          ? expense.id
+      const normalizeIds = <T extends { id: string }>(items: T[]) => items.map((item, index) => {
+        const nextId = item.id && !seenIds.has(item.id)
+          ? item.id
           : `${Date.now()}-${index}`;
         seenIds.add(nextId);
-        return { ...expense, id: nextId };
+        return { ...item, id: nextId };
       });
 
       const updatedExpenses = action.mode === 'replace'
         ? normalizeIds(action.expenses)
         : normalizeIds([...action.expenses, ...state.expenses]);
       saveExpenses(updatedExpenses);
-      return { ...state, expenses: updatedExpenses };
+
+      let updatedRecurring = state.recurringExpenses;
+      if (action.recurringExpenses) {
+        updatedRecurring = action.mode === 'replace'
+          ? normalizeIds(action.recurringExpenses)
+          : normalizeIds([...action.recurringExpenses, ...state.recurringExpenses]);
+        saveRecurringExpenses(updatedRecurring);
+      }
+
+      return { ...state, expenses: updatedExpenses, recurringExpenses: updatedRecurring };
     }
     case 'UPDATE_SETTINGS': {
       saveSettings(action.settings);
@@ -76,7 +138,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_LOADING':
       return { ...state, isLoading: action.isLoading };
     case 'SHOW_FEEDBACK':
-      return { ...state, feedback: { message: action.message, visible: true, type: action.feedbackType } };
+      return {
+        ...state,
+        feedback: {
+          message: action.message,
+          visible: true,
+          type: action.feedbackType,
+          onUndo: action.onUndo,
+        },
+      };
     case 'HIDE_FEEDBACK':
       return { ...state, feedback: { ...state.feedback, visible: false } };
     default:
@@ -87,18 +157,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
 interface AppContextType extends AppState {
   setSelectedDate: (date: Date) => void;
   addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
+  editExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
-  importExpenses: (expenses: Expense[], mode: 'merge' | 'replace') => Promise<void>;
+  addRecurringExpense: (expense: Omit<RecurringExpense, 'id'>) => Promise<void>;
+  editRecurringExpense: (expense: RecurringExpense) => Promise<void>;
+  deleteRecurringExpense: (id: string) => Promise<void>;
+  importExpenses: (data: { expenses: Expense[], recurringExpenses?: RecurringExpense[] }, mode: 'merge' | 'replace') => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
-  showFeedback: (message: string, type?: 'success' | 'error') => void;
+  showFeedback: (message: string, type?: 'success' | 'error', onUndo?: () => void) => void;
   hideFeedback: () => void;
   completeOnboarding: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+/**
+ * Non-throwing accessor. `useAppTheme` runs in a few places that sit outside
+ * the provider (the splash path, the error boundary), so it needs to ask for
+ * settings without exploding when they are not there yet.
+ */
+export const useAppOptional = () => useContext(AppContext);
+
 const initialState: AppState = {
   expenses: [],
+  recurringExpenses: [],
   settings: defaultSettings,
   selectedDate: new Date(),
   isLoading: true,
@@ -108,14 +190,20 @@ const initialState: AppState = {
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  // Lets the delete callbacks read the latest records without taking `state`
+  // as a dependency, which would re-create them on every expense change.
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   useEffect(() => {
     async function prepare() {
       try {
-        const [loadedExpenses, loadedSettings] = await Promise.all([
+        const [loadedExpenses, loadedSettings, loadedRecurring] = await Promise.all([
           loadExpenses(),
           loadSettings(),
+          loadRecurringExpenses()
         ]);
-        dispatch({ type: 'SET_INITIAL_DATA', expenses: loadedExpenses, settings: loadedSettings });
+        dispatch({ type: 'SET_INITIAL_DATA', expenses: loadedExpenses, recurringExpenses: loadedRecurring, settings: loadedSettings });
       } catch (e) {
         console.warn('Failed to load data', e);
         dispatch({ type: 'SHOW_FEEDBACK', message: 'Failed to load your data.', feedbackType: 'error' });
@@ -125,8 +213,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     prepare();
   }, []);
 
-  const showFeedback = useCallback((message: string, type: 'success' | 'error' = 'success') => {
-    dispatch({ type: 'SHOW_FEEDBACK', message, feedbackType: type });
+  const showFeedback = useCallback((
+    message: string,
+    type: 'success' | 'error' = 'success',
+    onUndo?: () => void,
+  ) => {
+    dispatch({ type: 'SHOW_FEEDBACK', message, feedbackType: type, onUndo });
   }, []);
 
   const hideFeedback = useCallback(() => {
@@ -147,19 +239,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [showFeedback]);
 
+  const editExpense = useCallback(async (expense: Expense) => {
+    try {
+      dispatch({ type: 'EDIT_EXPENSE', expense });
+      showFeedback('Expense updated.');
+    } catch {
+      showFeedback('Failed to update expense.', 'error');
+    }
+  }, [showFeedback]);
+
   const deleteExpense = useCallback(async (id: string) => {
     try {
+      // Captured before the dispatch so Undo can restore the exact record.
+      const removed = stateRef.current.expenses.find((e) => e.id === id);
       dispatch({ type: 'DELETE_EXPENSE', id });
-      showFeedback('Expense deleted.');
+      showFeedback(
+        'Expense deleted.',
+        'success',
+        removed ? () => dispatch({ type: 'RESTORE_EXPENSE', expense: removed }) : undefined,
+      );
     } catch {
       showFeedback('Failed to delete expense.', 'error');
     }
   }, [showFeedback]);
 
-  const importExpenses = useCallback(async (expenses: Expense[], mode: 'merge' | 'replace') => {
+  const addRecurringExpense = useCallback(async (newExp: Omit<RecurringExpense, 'id'>) => {
     try {
-      dispatch({ type: 'IMPORT_EXPENSES', expenses, mode });
-      showFeedback(`${expenses.length} expense${expenses.length === 1 ? '' : 's'} imported.`);
+      const recurringExpense: RecurringExpense = { ...newExp, id: Date.now().toString() };
+      dispatch({ type: 'ADD_RECURRING_EXPENSE', recurringExpense });
+      showFeedback('Recurring bill added!');
+    } catch {
+      showFeedback('Failed to add recurring bill.', 'error');
+    }
+  }, [showFeedback]);
+
+  const editRecurringExpense = useCallback(async (recurringExpense: RecurringExpense) => {
+    try {
+      dispatch({ type: 'EDIT_RECURRING_EXPENSE', recurringExpense });
+    } catch {
+      showFeedback('Failed to edit recurring bill.', 'error');
+    }
+  }, [showFeedback]);
+
+  const deleteRecurringExpense = useCallback(async (id: string) => {
+    try {
+      const removed = stateRef.current.recurringExpenses.find((e) => e.id === id);
+      dispatch({ type: 'DELETE_RECURRING_EXPENSE', id });
+      showFeedback(
+        'Recurring bill deleted.',
+        'success',
+        removed ? () => dispatch({ type: 'RESTORE_RECURRING_EXPENSE', recurringExpense: removed }) : undefined,
+      );
+    } catch {
+      showFeedback('Failed to delete recurring bill.', 'error');
+    }
+  }, [showFeedback]);
+
+  const importExpenses = useCallback(async (data: { expenses: Expense[], recurringExpenses?: RecurringExpense[] }, mode: 'merge' | 'replace') => {
+    try {
+      dispatch({ type: 'IMPORT_EXPENSES', expenses: data.expenses, recurringExpenses: data.recurringExpenses, mode });
+      showFeedback(`${data.expenses.length} expense${data.expenses.length === 1 ? '' : 's'} imported.`);
     } catch {
       showFeedback('Failed to import expenses.', 'error');
     }
@@ -184,7 +323,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         ...state,
         setSelectedDate,
         addExpense,
+        editExpense,
         deleteExpense,
+        addRecurringExpense,
+        editRecurringExpense,
+        deleteRecurringExpense,
         importExpenses,
         updateSettings,
         showFeedback,

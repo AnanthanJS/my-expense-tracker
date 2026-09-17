@@ -2,16 +2,22 @@ import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react-native';
 
-import { FONTS, SPACING } from '../constants/theme';
+import { SPACING, TEXT, RADII } from '../constants/theme';
 import { getMonthName } from '../utils/storage';
 import { useAppTheme } from '../hooks/useAppTheme';
 
 interface MonthPickerProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  /**
+   * Inline variant for MainHeader: no card chrome, tighter metrics. The month
+   * is now global context rather than a Home-screen control, so it lives in
+   * the header where every data screen can see it. (C1)
+   */
+  compact?: boolean;
 }
 
-const MonthPicker: React.FC<MonthPickerProps> = ({ selectedDate, onDateChange }) => {
+const MonthPicker: React.FC<MonthPickerProps> = ({ selectedDate, onDateChange, compact = false }) => {
   const { colors } = useAppTheme();
   
   const handlePrev = useCallback(() => {
@@ -41,7 +47,12 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ selectedDate, onDateChange })
 
   return (
     <View 
-      style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
+      style={[
+        styles.container,
+        compact
+          ? styles.containerCompact
+          : { backgroundColor: colors.surface, borderColor: colors.surfaceLight, borderWidth: 1 },
+      ]}
       accessible={true}
       accessibilityLabel={`Current viewing month: ${monthName}`}
       accessibilityRole="header"
@@ -55,7 +66,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ selectedDate, onDateChange })
         accessibilityRole="button"
         accessibilityHint="Switches data to the previous month"
       >
-        <IconChevronLeft size={22} color={colors.text} strokeWidth={2.5} />
+        <IconChevronLeft size={compact ? 18 : 22} color={colors.textMuted} strokeWidth={2.5} />
       </TouchableOpacity>
 
       <TouchableOpacity 
@@ -66,11 +77,14 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ selectedDate, onDateChange })
         accessibilityHint="Tap to jump to current month"
         accessibilityRole="button"
       >
-        <Text style={[
-          styles.monthText, 
-          { color: colors.text },
-          isCurrentMonth && { color: colors.primary }
-        ]}>
+        <Text
+          style={[
+            compact ? styles.monthTextCompact : styles.monthText,
+            { color: colors.text },
+            isCurrentMonth && { color: colors.primary },
+          ]}
+          numberOfLines={1}
+        >
           {monthName}
         </Text>
       </TouchableOpacity>
@@ -84,7 +98,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ selectedDate, onDateChange })
         accessibilityRole="button"
         accessibilityHint="Switches data to the next month"
       >
-        <IconChevronRight size={22} color={colors.text} strokeWidth={2.5} />
+        <IconChevronRight size={compact ? 18 : 22} color={colors.textMuted} strokeWidth={2.5} />
       </TouchableOpacity>
     </View>
   );
@@ -96,26 +110,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
-    borderRadius: 18,
+    borderRadius: RADII.lg,
     padding: 8,
-    borderWidth: 1,
+  },
+  containerCompact: {
+    marginBottom: 0,
+    padding: 0,
+    alignSelf: 'flex-start',
   },
   btn: {
     padding: 10,
     minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   monthDisplay: {
-    paddingHorizontal: 20,
-    flex: 1,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 44,
   },
+  monthTextCompact: {
+    ...TEXT.label,
+  },
   monthText: {
-    fontSize: 16,
-    fontFamily: FONTS.bold,
+    ...TEXT.subheading,
   },
 });
 

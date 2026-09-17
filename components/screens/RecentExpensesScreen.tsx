@@ -5,14 +5,19 @@ import {
   TextInput,
   StyleSheet,
   FlatList,
+  SectionList,
   TouchableOpacity,
   Platform,
   Modal,
   ScrollView,
   Alert,
+  Image,
+  Switch,
+  KeyboardAvoidingView,
 } from 'react-native';
 import type { ListRenderItemInfo } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import AnimatedRN, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import {
   IconSearch,
   IconX,
@@ -27,126 +32,251 @@ import {
   IconDotsVertical,
   IconReceipt,
   IconTrash,
+  IconPlus,
+  IconEdit,
 } from '@tabler/icons-react-native';
-import { FONTS, CATEGORY_COLORS, GUTTER, SCRIM } from '../../constants/theme';
-import type { Expense } from '../../utils/storage';
-import { formatDate } from '../../utils/formatDate';
+import { FONTS, GUTTER, GLASS, TEXT, RADII, SCRIM_BLUR_INTENSITY, SCRIM_BLUR_INTENSITY_OPAQUE, getCategoryColor } from '../../constants/theme';
+import type { Expense, RecurringExpense } from '../../utils/storage';
+import { formatDate, toLocalISODate } from '../../utils/formatDate';
+import { getMonthName } from '../../utils/storage';
+import { formatCurrency, formatCurrencyCompact } from '../../utils/formatCurrency';
 import { exportExpensesAsJson, exportExpensesAsPdf, pickExpensesJson } from '../../utils/expenseTransfer';
 import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
+import ExpenseForm from '../ExpenseForm';
 
 type ThemeColors = ReturnType<typeof useAppTheme>['colors'];
 
-const ITEM_HEIGHT = 68;
+/**
+ * (A10) Rows were a hard `height: 72` pinned by `getItemLayout`. At the 1.3x
+ * font scale the rows themselves allow, the description plus meta line needs
+ * ~48px against the 44px that left — so the text clipped. `minHeight` lets a
+ * row grow; dropping `getItemLayout` is the cost (the list measures rows
+ * itself instead), which is the right trade at this list size.
+ */
+const ITEM_MIN_HEIGHT = 72;
 
+/** "Today" / "Yesterday" / "14 Sep 2026" for a YYYY-MM-DD key. */
+function formatDayHeading(dateKey: string): string {
+  const today = toLocalISODate(new Date());
+  if (dateKey === today) return 'Today';
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  if (dateKey === toLocalISODate(yesterdayDate)) return 'Yesterday';
+  return formatDate(dateKey);
+}
+
+// ─── Expense Row ──────────────────────────────────────────────────────────────
 interface ExpenseRowProps {
   item: Expense;
   currency: string;
   onDelete: (id: string) => void;
+  onEdit: (expense: Expense) => void;
+  onViewReceipt?: (uri: string) => void;
   colors: ThemeColors;
+  isDark: boolean;
 }
 
-const ExpenseRow = React.memo(({ item, currency, onDelete, colors }: ExpenseRowProps) => {
-  // (#23) Destructive delete with confirmation prompt
-  const handleDelete = useCallback(() => {
-    Alert.alert(
-      'Delete Expense',
-      `Are you sure you want to delete "${item.description}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.id) },
-      ],
-    );
-  }, [item.id, item.description, onDelete]);
+const ExpenseRow = React.memo(({ item, currency, onDelete, onEdit, onViewReceipt, colors, isDark }: ExpenseRowProps) => {
+  const glass = isDark ? GLASS.dark : GLASS.light;
+  const categoryColor = getCategoryColor(item.category);
+
+  // (C4) Deletes immediately; the Snackbar offers Undo for 5s.
+  const handleDelete = useCallback(() => onDelete(item.id), [item.id, onDelete]);
 
   return (
-    // (#29) Fade in on mount, fade out on delete, shift neighbours smoothly
-    <Animated.View
+    <AnimatedRN.View
       entering={FadeIn.duration(200)}
       exiting={FadeOut.duration(180)}
       layout={LinearTransition.duration(200)}
-      style={[styles.item, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
-      accessible={true}
-      accessibilityLabel={`Expense: ${item.description}, Amount: ${currency}${item.amount.toFixed(2)}, Category: ${item.category}, Date: ${formatDate(item.date)}`}
+      style={[styles.item, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}
     >
-      <View
-        style={[styles.categoryDot, { backgroundColor: CATEGORY_COLORS[item.category] || colors.textDim }]}
-      />
-      <View style={styles.itemInfo}>
-        <Text
-          style={[styles.itemDesc, { color: colors.text }]}
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3} // (#16)
-        >
-          {item.description}
-        </Text>
-        <Text
-          style={[styles.itemMeta, { color: colors.textDim }]}
-          numberOfLines={1} // (#16) prevents clip at large system font sizes
-          maxFontSizeMultiplier={1.3}
-        >
-          {item.category} · {formatDate(item.date)}
-        </Text>
-      </View>
+      {/* (C5) The whole row opens the editor — previously an expense could
+          only be deleted and retyped. */}
+      <TouchableOpacity
+        style={styles.itemMain}
+        onPress={() => onEdit(item)}
+        activeOpacity={0.6}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.description}, ${formatCurrency(item.amount, currency)}, ${item.category}`}
+        accessibilityHint="Opens this expense for editing"
+      >
+        <View style={[styles.categoryPill, { backgroundColor: categoryColor + '28' }]}>
+          <View style={[styles.categoryDot, { backgroundColor: categoryColor }]} />
+        </View>
+        <View style={styles.itemInfo}>
+          <Text style={[styles.itemDesc, { color: colors.text }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+            {item.description}
+          </Text>
+          <Text style={[styles.itemMeta, { color: colors.textDim }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+            {item.category} · {formatDate(item.date)}
+          </Text>
+        </View>
+      </TouchableOpacity>
       <View style={styles.itemRight}>
-        <Text
-          style={[styles.itemAmount, { color: colors.text }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {currency}{item.amount.toFixed(2)}
-        </Text>
-        {/* (#14, #15, #23) accessibilityLabel + role; hitSlop 12; destructive icon & color */}
-        <TouchableOpacity
-          onPress={handleDelete}
-          style={styles.deleteBtn}
+        <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+          <Text style={[styles.itemAmount, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+            {formatCurrency(item.amount, currency, { negative: true })}
+          </Text>
+          {item.receiptUri && (
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel={`View receipt for ${item.description}`} accessibilityRole="button"
+              onPress={() => onViewReceipt && onViewReceipt(item.receiptUri!)}>
+              <IconReceipt size={13} color={colors.primary} />
+              <Text style={{ ...TEXT.caption, color: colors.primary }}>Receipt</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel={`Delete ${item.description} expense`}
-          accessibilityRole="button"
-        >
-          <IconTrash size={16} color={colors.danger} strokeWidth={2} />
+          accessibilityLabel={`Delete ${item.description}`} accessibilityRole="button">
+          <IconTrash size={15} color={colors.danger} strokeWidth={2} />
         </TouchableOpacity>
       </View>
-    </Animated.View>
+    </AnimatedRN.View>
   );
 });
 
+// ─── Recurring Card ───────────────────────────────────────────────────────────
+interface RecurringCardProps {
+  item: RecurringExpense;
+  currency: string;
+  colors: ThemeColors;
+  isDark: boolean;
+  onEdit: (item: RecurringExpense) => void;
+  onDelete: (id: string) => void;
+}
+
+const RecurringCard = React.memo(({ item, currency, colors, isDark, onEdit, onDelete }: RecurringCardProps) => {
+  const glass = isDark ? GLASS.dark : GLASS.light;
+  const categoryColor = getCategoryColor(item.category);
+
+  return (
+    <AnimatedRN.View
+      entering={FadeIn.duration(200)} exiting={FadeOut.duration(180)} layout={LinearTransition.duration(200)}
+      style={[styles.item, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow, paddingVertical: 14 }]}
+    >
+      <View style={[styles.categoryPill, { backgroundColor: categoryColor + '28' }]}>
+        <View style={[styles.categoryDot, { backgroundColor: categoryColor }]} />
+      </View>
+      <View style={styles.itemInfo}>
+        <Text style={[styles.itemDesc, { color: colors.text }]} numberOfLines={1}>{item.description}</Text>
+        <Text style={[styles.itemMeta, { color: colors.textDim }]} numberOfLines={1}>{item.category} · {item.frequency}</Text>
+        <Text style={[styles.itemMeta, { color: colors.primary, marginTop: 2 }]} numberOfLines={1}>Next: {item.nextDueDate}</Text>
+      </View>
+      <View style={styles.itemRight}>
+        <Text style={[styles.itemAmount, { color: colors.text }]}>
+          {item.isVariableAmount ? 'Variable' : formatCurrency(item.amount, currency)}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity onPress={() => onEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <IconEdit size={15} color={colors.textDim} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onDelete(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={`Delete ${item.description}`} accessibilityRole="button">
+            <IconTrash size={15} color={colors.danger} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </AnimatedRN.View>
+  );
+});
+
+// ─── Segmented Control ────────────────────────────────────────────────────────
+interface SegmentedControlProps {
+  segments: string[];
+  selectedIndex: number;
+  onChange: (index: number) => void;
+  colors: ThemeColors;
+  isDark: boolean;
+}
+
+const SegmentedControl = React.memo(({ segments, selectedIndex, onChange, colors, isDark }: SegmentedControlProps) => {
+  const glass = isDark ? GLASS.dark : GLASS.light;
+  return (
+    <View style={[styles.segContainer, { backgroundColor: glass.card, borderColor: glass.border }]}>
+      {segments.map((seg, i) => {
+        const isActive = i === selectedIndex;
+        return (
+          <TouchableOpacity key={seg}
+            style={[styles.segItem, isActive && [styles.segItemActive, { backgroundColor: colors.primary }]]}
+            onPress={() => onChange(i)} activeOpacity={0.8} accessibilityRole="tab" accessibilityState={{ selected: isActive }}>
+            <Text style={[styles.segLabel, { color: isActive ? colors.onPrimary : colors.textMuted }, isActive && { fontFamily: FONTS.text.semibold }]}>
+              {seg}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+});
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 type SortOption = 'newest' | 'oldest' | 'high-to-low' | 'low-to-high';
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 const RecentExpensesScreen: React.FC = () => {
-  const { expenses, settings, deleteExpense, importExpenses, showFeedback } = useApp();
-  const { colors } = useAppTheme();
-  const navbarHeight = useNavbarHeight(); // (#4)
+  const {
+    expenses, recurringExpenses, settings, selectedDate, deleteExpense, editExpense, addExpense, importExpenses, showFeedback,
+    addRecurringExpense, editRecurringExpense, deleteRecurringExpense,
+  } = useApp();
+  const { colors, isDark } = useAppTheme();
+  const navbarHeight = useNavbarHeight();
+  const glass = isDark ? GLASS.dark : GLASS.light;
 
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Expense filters
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [showTransferSheet, setShowTransferSheet] = useState(false); // (#21)
-
-  // Filter States
+  const [showTransferSheet, setShowTransferSheet] = useState(false);
+  const [viewingReceiptUri, setViewingReceiptUri] = useState<string | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('newest');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
 
-  const filtered = useMemo(() => {
-    let result = [...expenses];
+  // Recurring form
+  const [recurringModalVisible, setRecurringModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [recDescription, setRecDescription] = useState('');
+  const [recAmount, setRecAmount] = useState('');
+  const [recCategory, setRecCategory] = useState(settings.categories[0] || 'Bills');
+  const [recFrequency, setRecFrequency] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
+  const [recIsVariable, setRecIsVariable] = useState(false);
+  const [recNextDue, setRecNextDue] = useState(() => toLocalISODate(new Date()));
 
+  /**
+   * (C1) The list is scoped to the globally selected month, matching Home and
+   * Analytics — it used to show every expense ever recorded, so the three
+   * screens disagreed about what "your expenses" meant.
+   *
+   * Searching deliberately escapes that scope: a search that silently ignored
+   * eleven months of history would be worse than useless. The summary row says
+   * so whenever it happens.
+   */
+  const isSearching = searchQuery.trim().length > 0;
+
+  const filtered = useMemo(() => {
+    let result = isSearching
+      ? [...expenses]
+      : expenses.filter((e) => {
+          const date = new Date(e.date);
+          return (
+            date.getMonth() === selectedDate.getMonth() &&
+            date.getFullYear() === selectedDate.getFullYear()
+          );
+        });
     if (searchQuery) {
       const lower = searchQuery.toLowerCase();
-      result = result.filter(e =>
-        e.description.toLowerCase().includes(lower) ||
-        e.category.toLowerCase().includes(lower),
-      );
+      result = result.filter(e => e.description.toLowerCase().includes(lower) || e.category.toLowerCase().includes(lower));
     }
-
-    if (selectedCategories.length > 0) {
-      result = result.filter(e => selectedCategories.includes(e.category));
-    }
-
+    if (selectedCategories.length > 0) result = result.filter(e => selectedCategories.includes(e.category));
     if (minPrice) result = result.filter(e => e.amount >= parseFloat(minPrice));
     if (maxPrice) result = result.filter(e => e.amount <= parseFloat(maxPrice));
-
     result.sort((a, b) => {
       if (sortOption === 'newest') return new Date(b.date).getTime() - new Date(a.date).getTime();
       if (sortOption === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -154,63 +284,68 @@ const RecentExpensesScreen: React.FC = () => {
       if (sortOption === 'low-to-high') return a.amount - b.amount;
       return 0;
     });
-
     return result;
-  }, [expenses, searchQuery, selectedCategories, sortOption, minPrice, maxPrice]);
+  }, [expenses, isSearching, selectedDate, searchQuery, selectedCategories, sortOption, minPrice, maxPrice]);
 
-  const totalFiltered = useMemo(
-    () => filtered.reduce((sum, e) => sum + e.amount, 0),
-    [filtered],
-  );
+  const totalFiltered = useMemo(() => filtered.reduce((sum, e) => sum + e.amount, 0), [filtered]);
 
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories(prev =>
-      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat],
-    );
-  };
+  /**
+   * (C3) Group into day sections with a running total per day.
+   *
+   * A flat list of a few hundred uniform rows has no rhythm — there is nothing
+   * to anchor a scan on and no sense of "a heavy day". Sticky day headers give
+   * the list structure and the per-day total answers the question people
+   * actually scroll this screen to ask.
+   *
+   * Only meaningful for date ordering; amount sorts stay flat, since grouping
+   * by day would scatter the very ordering the user asked for.
+   */
+  const isDateSorted = sortOption === 'newest' || sortOption === 'oldest';
 
-  const resetFilters = () => {
-    setSelectedCategories([]);
-    setSortOption('newest');
-    setMinPrice('');
-    setMaxPrice('');
-  };
-
-  const hasActiveFilters = selectedCategories.length > 0 || minPrice || maxPrice || sortOption !== 'newest';
+  const sections = useMemo(() => {
+    if (!isDateSorted) {
+      return filtered.length > 0
+        ? [{ title: '', total: 0, showHeader: false, data: filtered }]
+        : [];
+    }
+    const byDay = new Map<string, Expense[]>();
+    filtered.forEach((expense) => {
+      const key = expense.date.split('T')[0];
+      const bucket = byDay.get(key);
+      if (bucket) bucket.push(expense);
+      else byDay.set(key, [expense]);
+    });
+    return Array.from(byDay.entries()).map(([key, data]) => ({
+      title: formatDayHeading(key),
+      total: data.reduce((sum, e) => sum + e.amount, 0),
+      showHeader: true,
+      data,
+    }));
+  }, [filtered, isDateSorted]);
+  const hasActiveFilters = selectedCategories.length > 0 || !!minPrice || !!maxPrice || sortOption !== 'newest';
   const activeFilterCount = useMemo(
-    () =>
-      selectedCategories.length +
-      (minPrice ? 1 : 0) +
-      (maxPrice ? 1 : 0) +
-      (sortOption !== 'newest' ? 1 : 0),
+    () => selectedCategories.length + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (sortOption !== 'newest' ? 1 : 0),
     [maxPrice, minPrice, selectedCategories.length, sortOption],
   );
 
-  // (#19) Route non-blocking alerts through Snackbar
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
+  };
+  const resetFilters = () => { setSelectedCategories([]); setSortOption('newest'); setMinPrice(''); setMaxPrice(''); };
+
+  // Export/Import
   const handleExportJson = useCallback(async () => {
     setShowTransferSheet(false);
-    if (filtered.length === 0) {
-      showFeedback('Nothing to export — no expenses in current view.', 'error');
-      return;
-    }
-    try {
-      await exportExpensesAsJson(filtered);
-    } catch (e) {
-      showFeedback(`Export failed: ${e instanceof Error ? e.message : 'Could not export JSON.'}`, 'error');
-    }
-  }, [filtered, showFeedback]);
+    if (filtered.length === 0 && recurringExpenses.length === 0) { showFeedback('Nothing to export.', 'error'); return; }
+    try { await exportExpensesAsJson(filtered, recurringExpenses); }
+    catch (e) { showFeedback(`Export failed: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error'); }
+  }, [filtered, recurringExpenses, showFeedback]);
 
   const handleExportPdf = useCallback(async () => {
     setShowTransferSheet(false);
-    if (filtered.length === 0) {
-      showFeedback('Nothing to export — no expenses in current view.', 'error');
-      return;
-    }
-    try {
-      await exportExpensesAsPdf(filtered, settings);
-    } catch (e) {
-      showFeedback(`Export failed: ${e instanceof Error ? e.message : 'Could not export PDF.'}`, 'error');
-    }
+    if (filtered.length === 0) { showFeedback('Nothing to export.', 'error'); return; }
+    try { await exportExpensesAsPdf(filtered, settings); }
+    catch (e) { showFeedback(`Export failed: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error'); }
   }, [filtered, settings, showFeedback]);
 
   const handleImportJson = useCallback(async () => {
@@ -218,186 +353,219 @@ const RecentExpensesScreen: React.FC = () => {
     try {
       const imported = await pickExpensesJson();
       if (!imported) return;
-      // (#19) Keep Alert only for this genuinely blocking merge/replace choice
-      Alert.alert(
-        'Import expenses',
-        `${imported.length} expense${imported.length === 1 ? '' : 's'} found. How would you like to import them?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Merge', onPress: () => importExpenses(imported, 'merge') },
-          { text: 'Replace', style: 'destructive', onPress: () => importExpenses(imported, 'replace') },
-        ],
-      );
-    } catch (e) {
-      showFeedback(`Import failed: ${e instanceof Error ? e.message : 'Could not import JSON.'}`, 'error');
-    }
+      const count = imported.expenses.length + imported.recurringExpenses.length;
+      Alert.alert('Import expenses', `${count} item${count === 1 ? '' : 's'} found. How would you like to import them?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Merge', onPress: () => importExpenses(imported, 'merge') },
+        { text: 'Replace', style: 'destructive', onPress: () => importExpenses(imported, 'replace') },
+      ]);
+    } catch (e) { showFeedback(`Import failed: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error'); }
   }, [importExpenses, showFeedback]);
 
-  const renderItem = useCallback(
+  // Recurring CRUD
+  const openRecurringForm = useCallback((expense?: RecurringExpense) => {
+    if (expense) {
+      setEditingId(expense.id); setRecDescription(expense.description);
+      setRecAmount(expense.amount > 0 ? expense.amount.toString() : '');
+      setRecCategory(expense.category); setRecFrequency(expense.frequency);
+      setRecIsVariable(expense.isVariableAmount); setRecNextDue(expense.nextDueDate);
+    } else {
+      setEditingId(null); setRecDescription(''); setRecAmount('');
+      setRecCategory(settings.categories[0] || 'Bills'); setRecFrequency('monthly');
+      setRecIsVariable(false); setRecNextDue(toLocalISODate(new Date()));
+    }
+    setRecurringModalVisible(true);
+  }, [settings.categories]);
+
+  const handleRecurringSave = () => {
+    const amt = parseFloat(recAmount);
+    if (!recDescription.trim() || (!recIsVariable && (isNaN(amt) || amt <= 0))) return;
+    const data = { description: recDescription.trim(), amount: recIsVariable ? 0 : amt, category: recCategory, frequency: recFrequency, nextDueDate: recNextDue, isVariableAmount: recIsVariable };
+    if (editingId) { editRecurringExpense({ ...data, id: editingId }); } else { addRecurringExpense(data); }
+    setRecurringModalVisible(false);
+  };
+
+  const renderExpense = useCallback(
     ({ item }: ListRenderItemInfo<Expense>) => (
-      <ExpenseRow item={item} currency={settings.currency} onDelete={deleteExpense} colors={colors} />
+      <ExpenseRow item={item} currency={settings.currency} onDelete={deleteExpense}
+        onEdit={setEditingExpense}
+        onViewReceipt={setViewingReceiptUri} colors={colors} isDark={isDark} />
     ),
-    [settings.currency, deleteExpense, colors],
+    [settings.currency, deleteExpense, colors, isDark],
   );
 
-  // (#22) Two distinct empty states
+  const renderRecurring = useCallback(
+    ({ item }: ListRenderItemInfo<RecurringExpense>) => (
+      <RecurringCard item={item} currency={settings.currency} colors={colors} isDark={isDark}
+        onEdit={openRecurringForm} onDelete={deleteRecurringExpense} />
+    ),
+    [settings.currency, colors, isDark, deleteRecurringExpense, openRecurringForm],
+  );
+
   const hasFiltersApplied = hasActiveFilters || searchQuery.length > 0;
-  const ListEmpty = useMemo(() => {
-    if (expenses.length === 0) {
-      // No data yet — friendly first-run state
-      return (
-        <View style={styles.empty}>
+
+  const ExpenseEmpty = useMemo(() => (
+    <View style={styles.empty}>
+      {expenses.length === 0 ? (
+        <>
           <IconReceipt size={64} color={colors.surfaceLight} strokeWidth={1} />
           <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>No expenses yet</Text>
-          <Text style={[styles.emptySubtitle, { color: colors.textDim }]}>
-            Head to the Home tab to add your first expense.
-          </Text>
-        </View>
-      );
-    }
-    // Data exists but filters matched nothing
-    return (
-      <View style={styles.empty}>
-        <IconSearch size={64} color={colors.surfaceLight} strokeWidth={1} />
-        <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>No results found</Text>
-        {hasFiltersApplied && (
-          <TouchableOpacity
-            onPress={() => { resetFilters(); setSearchQuery(''); }}
-            style={[styles.clearFiltersBtn, { borderColor: colors.primary }]}
-            accessibilityRole="button"
-            accessibilityLabel="Clear all filters"
-          >
-            <Text style={[styles.clearFiltersText, { color: colors.primary }]}>Clear filters</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  }, [expenses.length, hasFiltersApplied, colors]);
+          <Text style={[styles.emptySubtitle, { color: colors.textDim }]}>Head to the Home tab to add your first expense.</Text>
+        </>
+      ) : filtered.length === 0 && !hasFiltersApplied ? (
+        <>
+          <IconReceipt size={64} color={colors.surfaceLight} strokeWidth={1} />
+          <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>Nothing in {getMonthName(selectedDate)}</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textDim }]}>Use the month arrows in the header to look at another month.</Text>
+        </>
+      ) : (
+        <>
+          <IconSearch size={64} color={colors.surfaceLight} strokeWidth={1} />
+          <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>No results found</Text>
+          {hasFiltersApplied && (
+            <TouchableOpacity onPress={() => { resetFilters(); setSearchQuery(''); }}
+              style={[styles.clearFiltersBtn, { borderColor: colors.primary }]}>
+              <Text style={[styles.clearFiltersText, { color: colors.primary }]}>Clear filters</Text>
+            </TouchableOpacity>
+          )}
+        </>
+      )}
+    </View>
+  ), [expenses.length, filtered.length, hasFiltersApplied, selectedDate, colors]);
+
+  const RecurringEmpty = (
+    <View style={styles.empty}>
+      <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>No recurring bills yet</Text>
+      <Text style={[styles.emptySubtitle, { color: colors.textDim }]}>Tap + to add your first recurring bill.</Text>
+    </View>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Search Header */}
-      <View style={styles.header}>
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
-          <IconSearch size={18} color={colors.textDim} strokeWidth={2} style={{ marginRight: 8 }} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search expenses..."
-            placeholderTextColor={colors.textDim}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            accessibilityLabel="Search expenses" // (#14)
-          />
-          {searchQuery.length > 0 && (
-            // (#14) Clear search button labeled
-            <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              accessibilityLabel="Clear search"
-              accessibilityRole="button"
-            >
-              <IconX size={16} color={colors.textDim} strokeWidth={2.5} />
-            </TouchableOpacity>
-          )}
-        </View>
+      {/* Segmented Tab */}
+      <View style={[styles.segRow, { paddingHorizontal: GUTTER }]}>
+        <SegmentedControl
+          segments={['Expenses', 'Recurring']}
+          selectedIndex={activeTab}
+          onChange={setActiveTab}
+          colors={colors}
+          isDark={isDark}
+        />
+      </View>
 
-        {/* (#14) Filter button labeled; (#21) overflow dots beside it */}
-        <TouchableOpacity
-          style={[
-            styles.headerIconBtn,
-            { backgroundColor: colors.surface, borderColor: hasActiveFilters ? colors.primary : colors.surfaceLight },
-          ]}
-          onPress={() => setShowFilters(true)}
-          accessibilityLabel="Filter expenses"
-          accessibilityRole="button"
-        >
-          <IconFilter size={20} color={hasActiveFilters ? colors.primary : colors.textMuted} strokeWidth={2} />
-          {hasActiveFilters && (
-            <View style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.filterBadgeText, { color: colors.onPrimary }]}>
-                {activeFilterCount}
-              </Text>
+      {/* ── Expenses Tab ── */}
+      {activeTab === 0 && (
+        <>
+          <View style={styles.header}>
+            <View style={[styles.searchBar, { backgroundColor: glass.card, borderColor: glass.border }]}>
+              <IconSearch size={17} color={colors.textDim} strokeWidth={2} style={{ marginRight: 8 }} />
+              <TextInput style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search expenses..." placeholderTextColor={colors.textDim}
+                value={searchQuery} onChangeText={setSearchQuery} accessibilityLabel="Search expenses" />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search" accessibilityRole="button">
+                  <IconX size={15} color={colors.textDim} strokeWidth={2.5} />
+                </TouchableOpacity>
+              )}
             </View>
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity style={[styles.headerIconBtn, { backgroundColor: glass.card, borderColor: hasActiveFilters ? colors.primary : glass.border }]}
+              onPress={() => setShowFilters(true)} accessibilityLabel="Filter" accessibilityRole="button">
+              <IconFilter size={19} color={hasActiveFilters ? colors.primary : colors.textMuted} strokeWidth={2} />
+              {hasActiveFilters && (
+                <View style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.filterBadgeText, { color: colors.onPrimary }]}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.headerIconBtn, { backgroundColor: glass.card, borderColor: glass.border }]}
+              onPress={() => setShowTransferSheet(true)} accessibilityLabel="Export or import" accessibilityRole="button">
+              <IconDotsVertical size={19} color={colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
 
-        {/* (#21) Overflow menu button — replaces always-visible transferRow */}
-        <TouchableOpacity
-          style={[styles.headerIconBtn, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
-          onPress={() => setShowTransferSheet(true)}
-          accessibilityLabel="Export or import expenses"
-          accessibilityRole="button"
-        >
-          <IconDotsVertical size={20} color={colors.textMuted} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryText, { color: colors.textDim }]}>
+              {filtered.length} expense{filtered.length !== 1 ? 's' : ''}
+              {isSearching ? ' · all months' : ` · ${getMonthName(selectedDate)}`}
+            </Text>
+            <Text style={[styles.summaryAmount, { color: colors.primary }]}>
+              {filtered.length > 0 ? formatCurrencyCompact(totalFiltered, settings.currency) : ''}
+            </Text>
+          </View>
 
-      {/* Summary Row — always rendered (#22) */}
-      <View style={styles.summaryRow}>
-        <Text style={[styles.summaryText, { color: colors.textDim }]}>
-          {filtered.length} expense{filtered.length !== 1 ? 's' : ''} shown
-        </Text>
-        <Text style={[styles.summaryAmount, { color: colors.primary }]}>
-          {filtered.length > 0 ? `${settings.currency}${totalFiltered.toFixed(0)}` : ''}
-        </Text>
-      </View>
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={renderExpense}
+            renderSectionHeader={({ section }) => section.showHeader ? (
+              <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+                <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{section.title}</Text>
+                <Text style={[styles.sectionTotal, { color: colors.textDim }]}>
+                  {formatCurrencyCompact(section.total, settings.currency)}
+                </Text>
+              </View>
+            ) : null}
+            stickySectionHeadersEnabled
+            initialNumToRender={12}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={ExpenseEmpty}
+            ListFooterComponent={<View style={{ height: navbarHeight + 16 }} />}
+          />
+        </>
+      )}
 
-      {/* Main List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
-        initialNumToRender={12}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={ListEmpty}
-        ListFooterComponent={<View style={{ height: navbarHeight }} />}
+      {/* ── Recurring Tab ── */}
+      {activeTab === 1 && (
+        <>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryText, { color: colors.textDim }]}>
+              {recurringExpenses.length} recurring bill{recurringExpenses.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          <FlatList
+            data={recurringExpenses} keyExtractor={(item) => item.id} renderItem={renderRecurring}
+            contentContainerStyle={styles.listContent} ListEmptyComponent={RecurringEmpty}
+            ListFooterComponent={<View style={{ height: navbarHeight + 80 }} />}
+          />
+          <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary, bottom: navbarHeight + 16 }]}
+            onPress={() => openRecurringForm()}>
+            <IconPlus size={24} color={colors.onPrimary} />
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* (C5) Edit sheet — the same form used to add, in edit mode. */}
+      <ExpenseForm
+        visible={editingExpense !== null}
+        editing={editingExpense}
+        onClose={() => setEditingExpense(null)}
+        onAdd={addExpense}
+        onSave={(updated) => { editExpense(updated); setEditingExpense(null); }}
       />
 
       {/* Filter Modal */}
-      <Modal
-        visible={showFilters}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowFilters(false)}
-      >
-        {/* (#13) SCRIM token at 0.5 — was 0.8 */}
-        <View style={[styles.modalOverlay, { backgroundColor: `rgba(0,0,0,${SCRIM})` }]}>
+      <Modal visible={showFilters} animationType="slide" transparent onRequestClose={() => setShowFilters(false)}>
+        <BlurView intensity={SCRIM_BLUR_INTENSITY} tint="dark" style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Filter & Sort</Text>
-              <TouchableOpacity
-                onPress={() => setShowFilters(false)}
-                accessibilityLabel="Close filter sheet"
-                accessibilityRole="button"
-              >
+              <TouchableOpacity onPress={() => setShowFilters(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Close filters" accessibilityRole="button">
                 <IconX size={24} color={colors.textDim} />
               </TouchableOpacity>
             </View>
-
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
-              {/* Sort Section */}
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>SORT BY</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>SORT BY</Text>
                 <View style={styles.sortGrid}>
                   {(['newest', 'oldest', 'high-to-low', 'low-to-high'] as SortOption[]).map(opt => (
-                    <TouchableOpacity
-                      key={opt}
-                      style={[
-                        styles.sortCard,
-                        { backgroundColor: colors.surfaceLight, borderColor: sortOption === opt ? colors.primary : 'transparent' },
-                      ]}
-                      onPress={() => setSortOption(opt)}
-                      // (#14) Sort cards get selected state
-                      accessibilityState={{ selected: sortOption === opt }}
-                      accessibilityRole="radio"
-                      accessibilityLabel={opt.replace(/-/g, ' ')}
-                    >
-                      {opt === 'high-to-low'
-                        ? <IconTrendingUp size={18} color={sortOption === opt ? colors.primary : colors.textDim} />
-                        : opt === 'low-to-high'
-                          ? <IconTrendingDown size={18} color={sortOption === opt ? colors.primary : colors.textDim} />
-                          : <IconArrowsSort size={18} color={sortOption === opt ? colors.primary : colors.textDim} />
-                      }
+                    <TouchableOpacity key={opt}
+                      style={[styles.sortCard, { backgroundColor: colors.surfaceLight, borderColor: sortOption === opt ? colors.primary : 'transparent' }]}
+                      onPress={() => setSortOption(opt)} accessibilityState={{ selected: sortOption === opt }} accessibilityRole="radio" accessibilityLabel={opt.replace(/-/g, ' ')}>
+                      {opt === 'high-to-low' ? <IconTrendingUp size={18} color={sortOption === opt ? colors.primary : colors.textDim} />
+                        : opt === 'low-to-high' ? <IconTrendingDown size={18} color={sortOption === opt ? colors.primary : colors.textDim} />
+                        : <IconArrowsSort size={18} color={sortOption === opt ? colors.primary : colors.textDim} />}
                       <Text style={[styles.sortLabel, { color: sortOption === opt ? colors.text : colors.textMuted }]}>
                         {opt.replace(/-/g, ' ').toUpperCase()}
                       </Text>
@@ -405,56 +573,26 @@ const RecentExpensesScreen: React.FC = () => {
                   ))}
                 </View>
               </View>
-
-              {/* Price Range */}
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>PRICE RANGE</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>PRICE RANGE</Text>
                 <View style={styles.rangeRow}>
-                  <TextInput
-                    style={[styles.modalInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
-                    placeholder="Min"
-                    placeholderTextColor={colors.textDim}
-                    keyboardType="decimal-pad"
-                    value={minPrice}
-                    onChangeText={setMinPrice}
-                    accessibilityLabel="Minimum price"
-                  />
+                  <TextInput style={[styles.modalInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
+                    placeholder="Min" placeholderTextColor={colors.textDim} keyboardType="decimal-pad" value={minPrice} onChangeText={setMinPrice} accessibilityLabel="Minimum price" />
                   <Text style={{ color: colors.textDim }}>-</Text>
-                  <TextInput
-                    style={[styles.modalInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
-                    placeholder="Max"
-                    placeholderTextColor={colors.textDim}
-                    keyboardType="decimal-pad"
-                    value={maxPrice}
-                    onChangeText={setMaxPrice}
-                    accessibilityLabel="Maximum price"
-                  />
+                  <TextInput style={[styles.modalInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
+                    placeholder="Max" placeholderTextColor={colors.textDim} keyboardType="decimal-pad" value={maxPrice} onChangeText={setMaxPrice} accessibilityLabel="Maximum price" />
                 </View>
               </View>
-
-              {/* Categories */}
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>CATEGORIES</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>CATEGORIES</Text>
                 <View style={styles.catGrid}>
                   {settings.categories.map(cat => {
                     const active = selectedCategories.includes(cat);
                     return (
-                      <TouchableOpacity
-                        key={cat}
-                        style={[
-                          styles.catChip,
-                          { backgroundColor: colors.surfaceLight },
-                          active && { backgroundColor: colors.primary },
-                        ]}
-                        onPress={() => toggleCategory(cat)}
-                        // (#14) Category chips get selected state
-                        accessibilityState={{ selected: active }}
-                        accessibilityRole="checkbox"
-                        accessibilityLabel={cat}
-                      >
-                        <Text style={[styles.catChipText, { color: active ? colors.onPrimary : colors.textMuted }]}>
-                          {cat}
-                        </Text>
+                      <TouchableOpacity key={cat}
+                        style={[styles.catChip, { backgroundColor: colors.surfaceLight }, active && { backgroundColor: colors.primary }]}
+                        onPress={() => toggleCategory(cat)} accessibilityState={{ selected: active }} accessibilityRole="checkbox" accessibilityLabel={cat}>
+                        <Text style={[styles.catChipText, { color: active ? colors.onPrimary : colors.textMuted }]}>{cat}</Text>
                         {active && <IconCheck size={14} color={colors.onPrimary} style={{ marginLeft: 4 }} />}
                       </TouchableOpacity>
                     );
@@ -462,88 +600,120 @@ const RecentExpensesScreen: React.FC = () => {
                 </View>
               </View>
             </ScrollView>
-
             <View style={[styles.modalFooter, { borderTopColor: colors.surfaceLight }]}>
               <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
                 <Text style={[styles.resetText, { color: colors.textDim }]}>Reset All</Text>
               </TouchableOpacity>
-              {/* (#20) "Apply Filters" → "Done" — filters apply live, button only dismisses */}
-              <TouchableOpacity
-                onPress={() => setShowFilters(false)}
-                style={[styles.applyBtn, { backgroundColor: colors.primary }]}
-                accessibilityLabel="Done, close filter sheet"
-                accessibilityRole="button"
-              >
+              <TouchableOpacity onPress={() => setShowFilters(false)} style={[styles.applyBtn, { backgroundColor: colors.primary }]}>
                 <Text style={[styles.applyText, { color: colors.onPrimary }]}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </BlurView>
       </Modal>
 
-      {/* (#21) Transfer Bottom Sheet — export/import moved out of main UI */}
-      <Modal
-        visible={showTransferSheet}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowTransferSheet(false)}
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: `rgba(0,0,0,${SCRIM})` }]}>
+      {/* Transfer Sheet */}
+      <Modal visible={showTransferSheet} animationType="slide" transparent onRequestClose={() => setShowTransferSheet(false)}>
+        <BlurView intensity={SCRIM_BLUR_INTENSITY} tint="dark" style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Export & Import</Text>
-              <TouchableOpacity
-                onPress={() => setShowTransferSheet(false)}
-                accessibilityLabel="Close export sheet"
-                accessibilityRole="button"
-              >
+              <TouchableOpacity onPress={() => setShowTransferSheet(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Close export and import sheet" accessibilityRole="button">
                 <IconX size={24} color={colors.textDim} />
               </TouchableOpacity>
             </View>
-
             <View style={styles.transferSheetBody}>
-              {/* (#14) All transfer buttons labeled */}
-              <TouchableOpacity
-                style={[styles.transferSheetRow, { borderBottomColor: colors.surfaceLight }]}
-                onPress={handleExportJson}
-                accessibilityLabel="Export as JSON"
-                accessibilityRole="button"
-              >
-                <IconFileExport size={22} color={colors.primary} />
-                <View style={styles.transferSheetText}>
-                  <Text style={[styles.transferSheetTitle, { color: colors.text }]}>Export JSON</Text>
-                  <Text style={[styles.transferSheetDesc, { color: colors.textDim }]}>Share current view as a JSON file</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.transferSheetRow, { borderBottomColor: colors.surfaceLight }]}
-                onPress={handleExportPdf}
-                accessibilityLabel="Export as PDF"
-                accessibilityRole="button"
-              >
-                <IconFileTypePdf size={22} color={colors.primary} />
-                <View style={styles.transferSheetText}>
-                  <Text style={[styles.transferSheetTitle, { color: colors.text }]}>Export PDF</Text>
-                  <Text style={[styles.transferSheetDesc, { color: colors.textDim }]}>Save current view as a printable PDF</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.transferSheetRow, { borderBottomColor: 'transparent' }]}
-                onPress={handleImportJson}
-                accessibilityLabel="Import from JSON"
-                accessibilityRole="button"
-              >
-                <IconFileImport size={22} color={colors.primary} />
-                <View style={styles.transferSheetText}>
-                  <Text style={[styles.transferSheetTitle, { color: colors.text }]}>Import JSON</Text>
-                  <Text style={[styles.transferSheetDesc, { color: colors.textDim }]}>Merge or replace from a JSON file</Text>
-                </View>
-              </TouchableOpacity>
+              {[
+                { icon: <IconFileExport size={22} color={colors.primary} />, title: 'Export JSON', desc: 'Share current view as a JSON file', onPress: handleExportJson },
+                { icon: <IconFileTypePdf size={22} color={colors.primary} />, title: 'Export PDF', desc: 'Save current view as a printable PDF', onPress: handleExportPdf },
+                { icon: <IconFileImport size={22} color={colors.primary} />, title: 'Import JSON', desc: 'Merge or replace from a JSON file', onPress: handleImportJson },
+              ].map((row, i, arr) => (
+                <TouchableOpacity key={row.title}
+                  style={[styles.transferSheetRow, { borderBottomColor: i < arr.length - 1 ? colors.surfaceLight : 'transparent' }]}
+                  onPress={row.onPress} accessibilityLabel={row.title} accessibilityRole="button">
+                  {row.icon}
+                  <View style={styles.transferSheetText}>
+                    <Text style={[styles.transferSheetTitle, { color: colors.text }]}>{row.title}</Text>
+                    <Text style={[styles.transferSheetDesc, { color: colors.textDim }]}>{row.desc}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
-        </View>
+        </BlurView>
+      </Modal>
+
+      {/* Receipt Viewer */}
+      <Modal visible={!!viewingReceiptUri} transparent animationType="fade" onRequestClose={() => setViewingReceiptUri(null)}>
+        {/* Full-screen photo viewer — deliberately opaque, not the standard scrim. */}
+        <BlurView intensity={SCRIM_BLUR_INTENSITY_OPAQUE} tint="dark" style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 20, zIndex: 10, padding: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADII.pill }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Close receipt" accessibilityRole="button"
+            onPress={() => setViewingReceiptUri(null)}>
+            <IconX size={24} color="#fff" />
+          </TouchableOpacity>
+          {viewingReceiptUri && (
+            <Image source={{ uri: viewingReceiptUri }} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
+          )}
+        </BlurView>
+      </Modal>
+
+      {/* Recurring Form Modal */}
+      <Modal visible={recurringModalVisible} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <BlurView intensity={SCRIM_BLUR_INTENSITY} tint="dark" style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {editingId ? 'Edit Recurring Bill' : 'New Recurring Bill'}
+                </Text>
+                <TouchableOpacity onPress={() => setRecurringModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Close recurring bill form" accessibilityRole="button">
+                <IconX size={24} color={colors.textDim} />
+              </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+                <Text style={[styles.formLabel, { color: colors.textMuted }]}>Description</Text>
+                <TextInput style={[styles.formInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
+                  value={recDescription} onChangeText={setRecDescription} placeholder="e.g. Gym Membership" placeholderTextColor={colors.textDim} />
+                <View style={styles.switchRow}>
+                  <Text style={[styles.formLabel, { color: colors.textMuted, marginBottom: 0 }]}>Variable Amount?</Text>
+                  <Switch value={recIsVariable} onValueChange={setRecIsVariable} trackColor={{ true: colors.primary }} />
+                </View>
+                {!recIsVariable && (
+                  <>
+                    <Text style={[styles.formLabel, { color: colors.textMuted }]}>Amount</Text>
+                    <TextInput style={[styles.formInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
+                      value={recAmount} onChangeText={setRecAmount} placeholder="0.00" placeholderTextColor={colors.textDim} keyboardType="numeric" />
+                  </>
+                )}
+                <Text style={[styles.formLabel, { color: colors.textMuted }]}>Frequency</Text>
+                <View style={styles.freqRow}>
+                  {(['monthly', 'weekly', 'yearly'] as const).map(freq => (
+                    <TouchableOpacity key={freq}
+                      style={[styles.freqChip, { backgroundColor: colors.surfaceLight }, recFrequency === freq && { backgroundColor: colors.primary }]}
+                      onPress={() => setRecFrequency(freq)}>
+                      <Text style={[styles.catChipText, { color: recFrequency === freq ? colors.onPrimary : colors.textMuted }]}>
+                        {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={[styles.formLabel, { color: colors.textMuted }]}>Next Due Date (YYYY-MM-DD)</Text>
+                <TextInput style={[styles.formInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
+                  value={recNextDue} onChangeText={setRecNextDue} placeholder="2026-09-01" placeholderTextColor={colors.textDim} />
+                <TouchableOpacity style={[styles.applyBtn, { backgroundColor: colors.primary, marginTop: 24 }]} onPress={handleRecurringSave}>
+                  <Text style={[styles.applyText, { color: colors.onPrimary }]}>Save</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </BlurView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -551,153 +721,81 @@ const RecentExpensesScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    // (#3) GUTTER — was SPACING.xl (24), now 20
-    paddingHorizontal: GUTTER,
-    paddingTop: 10,
-    gap: 10,
-    marginBottom: 12,
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: FONTS.regular,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-  },
-  headerIconBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  filterBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  filterBadgeText: {
-    fontSize: 10,
-    fontFamily: FONTS.bold,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    // (#3) GUTTER
-    paddingHorizontal: GUTTER,
-    marginBottom: 12,
-  },
-  summaryText: { fontSize: 11, fontFamily: FONTS.regular },
-  summaryAmount: { fontSize: 13, fontFamily: FONTS.bold },
-  // (#3) GUTTER
+  segRow: { paddingTop: 10, paddingBottom: 6 },
+  segContainer: { flexDirection: 'row', borderRadius: RADII.md, borderWidth: 1, padding: 4, gap: 4 },
+  segItem: { flex: 1, minHeight: 44, borderRadius: RADII.sm, alignItems: 'center', justifyContent: 'center' },
+  segItemActive: { borderRadius: RADII.sm },
+  segLabel: { ...TEXT.label },
+  header: { flexDirection: 'row', paddingHorizontal: GUTTER, paddingTop: 4, gap: 10, marginBottom: 10 },
+  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: RADII.md, paddingHorizontal: 14, borderWidth: 1 },
+  searchInput: { flex: 1, ...TEXT.bodySm, paddingVertical: Platform.OS === 'ios' ? 12 : 8 },
+  headerIconBtn: { width: 46, height: 46, borderRadius: RADII.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  filterBadge: { position: 'absolute', top: -6, right: -6, minWidth: 19, height: 19, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  filterBadgeText: { ...TEXT.caption, fontFamily: FONTS.text.bold },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: GUTTER, marginBottom: 10 },
+  summaryText: { ...TEXT.caption },
+  summaryAmount: { ...TEXT.money },
   listContent: { paddingHorizontal: GUTTER },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    gap: 12,
-    height: ITEM_HEIGHT,
-  },
-  categoryDot: { width: 8, height: 8, borderRadius: 4 },
-  itemInfo: { flex: 1 },
-  itemDesc: { fontSize: 14, fontFamily: FONTS.medium },
-  itemMeta: { fontSize: 12, fontFamily: FONTS.regular },
-  itemRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  itemAmount: { fontSize: 14, fontFamily: FONTS.bold },
-  deleteBtn: { padding: 4 },
-
-  // (#22) Empty states
-  empty: { alignItems: 'center', paddingVertical: 80, gap: 12 },
-  emptyTitle: { fontSize: 16, fontFamily: FONTS.bold },
-  emptySubtitle: { fontSize: 13, fontFamily: FONTS.regular, textAlign: 'center', paddingHorizontal: 32 },
-  clearFiltersBtn: { marginTop: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 8 },
-  clearFiltersText: { fontSize: 13, fontFamily: FONTS.bold },
-
-  // Filter Modal
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    maxHeight: '85%',
-    paddingTop: 24,
-  },
-  modalHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 6,
   },
-  modalTitle: { fontSize: 20, fontFamily: FONTS.bold },
+  sectionTitle: { ...TEXT.overline },
+  sectionTotal: { ...TEXT.moneySm },
+  item: {
+    flexDirection: 'row', alignItems: 'center', borderRadius: RADII.md, padding: 14, marginBottom: 10,
+    borderWidth: 1, gap: 12, minHeight: ITEM_MIN_HEIGHT,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 3,
+  },
+  categoryPill: { width: 32, height: 32, borderRadius: RADII.sm, alignItems: 'center', justifyContent: 'center' },
+  categoryDot: { width: 10, height: 10, borderRadius: RADII.pill },
+  itemMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  itemInfo: { flex: 1 },
+  itemDesc: { ...TEXT.rowTitle },
+  itemMeta: { ...TEXT.caption, marginTop: 2 },
+  itemRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  itemAmount: { ...TEXT.money },
+  deleteBtn: { padding: 4 },
+  empty: { alignItems: 'center', paddingVertical: 80, gap: 12 },
+  emptyTitle: { ...TEXT.subheading },
+  emptySubtitle: { ...TEXT.proseSm, textAlign: 'center', paddingHorizontal: 32 },
+  clearFiltersBtn: { marginTop: 4, borderWidth: 1, borderRadius: RADII.pill, paddingHorizontal: 20, minHeight: 44, justifyContent: 'center' },
+  clearFiltersText: { ...TEXT.buttonSm },
+  fab: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: RADII.xxl, borderTopRightRadius: RADII.xxl, maxHeight: '88%', paddingTop: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, marginBottom: 20 },
+  modalTitle: { ...TEXT.heading },
   modalScroll: { paddingHorizontal: 24, paddingBottom: 40 },
   modalSection: { marginBottom: 24 },
-  modalSectionTitle: { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 1.5, marginBottom: 12 },
+  modalSectionTitle: { ...TEXT.overline, marginBottom: 12 },
   sortGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  sortCard: {
-    width: '48.5%',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: 6,
-  },
-  sortLabel: { fontSize: 10, fontFamily: FONTS.bold },
+  sortCard: { width: '48.5%', padding: 12, borderRadius: RADII.sm, borderWidth: 1, alignItems: 'center', gap: 6 },
+  sortLabel: { ...TEXT.caption, fontFamily: FONTS.text.semibold },
   rangeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  modalInput: { flex: 1, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: FONTS.regular },
+  modalInput: { flex: 1, borderRadius: RADII.sm, padding: 12, ...TEXT.bodySm },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  catChipText: { fontSize: 12, fontFamily: FONTS.medium },
-  modalFooter: {
-    flexDirection: 'row',
-    padding: 24,
-    borderTopWidth: 1,
-    gap: 16,
-  },
-  resetBtn: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  resetText: { fontSize: 14, fontFamily: FONTS.bold },
-  applyBtn: { flex: 2, paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
-  applyText: { fontSize: 16, fontFamily: FONTS.bold },
-
-  // (#21) Transfer bottom sheet
+  catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, minHeight: 44, borderRadius: RADII.pill },
+  catChipText: { ...TEXT.labelSm },
+  modalFooter: { flexDirection: 'row', padding: 24, borderTopWidth: 1, gap: 16 },
+  resetBtn: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
+  resetText: { ...TEXT.buttonSm },
+  applyBtn: { flex: 2, minHeight: 52, justifyContent: 'center', borderRadius: RADII.md, alignItems: 'center' },
+  applyText: { ...TEXT.button },
   transferSheetBody: { paddingHorizontal: 24, paddingBottom: 40 },
-  transferSheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
+  transferSheetRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, borderBottomWidth: 1 },
   transferSheetText: { flex: 1 },
-  transferSheetTitle: { fontSize: 15, fontFamily: FONTS.bold, marginBottom: 2 },
-  transferSheetDesc: { fontSize: 12, fontFamily: FONTS.regular },
+  transferSheetTitle: { ...TEXT.rowTitle, marginBottom: 2 },
+  transferSheetDesc: { ...TEXT.caption },
+  formLabel: { ...TEXT.labelSm, marginBottom: 8, marginTop: 12 },
+  formInput: { borderRadius: RADII.sm, padding: 14, ...TEXT.bodySm },
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  freqRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  freqChip: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 44, borderRadius: RADII.sm },
 });
 
 export default React.memo(RecentExpensesScreen);
+

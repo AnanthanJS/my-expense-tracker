@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { FONTS, CATEGORY_COLORS, SPACING } from '../constants/theme';
+import { SPACING, GLASS, TEXT, RADII, getCategoryColor } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useApp } from '../context/AppContext';
+import { formatCurrencyCompact } from '../utils/formatCurrency';
 
 interface CategoryBreakdownProps {
   expenses: { category: string; amount: number }[];
@@ -15,7 +17,9 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
   totalSpent,
   currency,
 }) => {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
+  const { settings } = useApp();
+  const glass = isDark ? GLASS.dark : GLASS.light;
   
   const sortedCategories = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
@@ -32,22 +36,42 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
       entering={FadeIn.duration(250)}
       exiting={FadeOut.duration(200)}
       layout={LinearTransition.duration(200)}
-      style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
+      style={[styles.container, { 
+        backgroundColor: glass.card, 
+        borderColor: glass.border,
+        shadowColor: glass.shadow,
+        elevation: 3
+      }]}
       accessible={true}
-      accessibilityLabel={`Spending breakdown by category. Total spent: ${currency}${totalSpent.toFixed(2)}`}
+      accessibilityLabel={`Spending breakdown by category. Total spent: ${formatCurrencyCompact(totalSpent, currency)}`}
     >
-      <Text style={[styles.title, { color: colors.textMuted }]}>BY CATEGORY</Text>
+      <Text style={[styles.title, { color: colors.textDim }]}>BY CATEGORY</Text>
       <View style={styles.list}>
         {sortedCategories.map(([category, amount]) => {
-          const percentage = totalSpent > 0 ? (amount / totalSpent) * 100 : 0;
+          const budgetLimit = settings.categoryBudgets?.[category];
+          let percentage = totalSpent > 0 ? (amount / totalSpent) * 100 : 0;
+          let barColor = getCategoryColor(category);
+          let displayAmount = formatCurrencyCompact(amount, currency);
+
+          if (budgetLimit && budgetLimit > 0) {
+            percentage = (amount / budgetLimit) * 100;
+            displayAmount = `${formatCurrencyCompact(amount, currency)} / ${budgetLimit.toLocaleString()}`;
+            if (percentage >= 100) {
+              barColor = colors.danger;
+            } else if (percentage >= 80) {
+              barColor = '#f59e0b'; // warning color
+            }
+          }
+          const barWidth = Math.min(percentage, 100);
+
           return (
             <View 
               key={category} 
               style={styles.item}
               accessible={true}
-              accessibilityLabel={`${category}: ${currency}${amount.toFixed(0)}, which is ${Math.round(percentage)}% of total spending.`}
+              accessibilityLabel={`${category}: ${displayAmount}, which is ${Math.round(percentage)}% of ${budgetLimit ? 'budget limit' : 'total spending'}.`}
             >
-              <Text style={[styles.categoryName, { color: colors.textMuted }]} numberOfLines={1}>
+              <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
                 {category}
               </Text>
               <View style={[styles.barContainer, { backgroundColor: colors.surfaceLight }]} aria-hidden={true}>
@@ -55,14 +79,19 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
                   style={[
                     styles.bar,
                     {
-                      width: `${percentage}%`,
-                      backgroundColor: CATEGORY_COLORS[category] || colors.textDim,
+                      width: `${barWidth}%`,
+                      backgroundColor: barColor,
                     },
                   ]}
                 />
               </View>
-              <Text style={[styles.amount, { color: colors.textDim }]}>
-                {currency}{amount.toFixed(0)}
+              <Text
+                style={[styles.amount, { color: colors.textMuted }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {displayAmount}
               </Text>
             </View>
           );
@@ -74,16 +103,14 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 20,
+    borderRadius: RADII.xl,
     padding: SPACING.lg,
     marginBottom: SPACING.lg,
     borderWidth: 1,
   },
   title: {
-    fontSize: 12,
-    fontFamily: FONTS.bold,
-    letterSpacing: 1,
-    marginBottom: 15,
+    ...TEXT.overline,
+    marginBottom: SPACING.lg,
   },
   list: {
     gap: 12,
@@ -94,24 +121,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   categoryName: {
-    fontSize: 12,
-    fontFamily: FONTS.regular,
+    ...TEXT.labelSm,
     width: 80,
   },
   barContainer: {
     flex: 1,
     height: 12,
-    borderRadius: 6,
+    borderRadius: RADII.pill,
     overflow: 'hidden',
   },
   bar: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: RADII.pill,
   },
   amount: {
-    fontSize: 12,
-    fontFamily: FONTS.regular,
-    width: 60,
+    ...TEXT.moneySm,
+    minWidth: 64,
+    maxWidth: 120,
+    flexShrink: 0,
     textAlign: 'right',
   },
 });

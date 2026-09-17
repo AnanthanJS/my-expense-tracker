@@ -9,18 +9,20 @@ import {
 } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IconHome,
   IconReceipt2,
   IconSettings,
   IconInfoCircle,
+  IconChartPie,
 } from '@tabler/icons-react-native';
 import type { IconProps } from '@tabler/icons-react-native';
-import { FONTS, SPACING, ELEVATION } from '../constants/theme';
+import { FONTS, SPACING, ELEVATION, GLASS, TEXT, RADII } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 
-export type TabName = 'home' | 'recent' | 'settings' | 'about';
+export type TabName = 'home' | 'recent' | 'analytics' | 'settings' | 'about';
 
 interface NavItem {
   key: TabName;
@@ -30,10 +32,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'home',     label: 'Home',     icon: IconHome,       routeName: 'Home' },
-  { key: 'recent',   label: 'Expenses', icon: IconReceipt2,   routeName: 'Expenses' },
-  { key: 'settings', label: 'Settings', icon: IconSettings,   routeName: 'Settings' },
-  { key: 'about',    label: 'About',    icon: IconInfoCircle, routeName: 'About' },
+  { key: 'home',      label: 'Home',      icon: IconHome,       routeName: 'Home' },
+  { key: 'recent',    label: 'Expenses',  icon: IconReceipt2,   routeName: 'Expenses' },
+  { key: 'analytics', label: 'Analytics', icon: IconChartPie,   routeName: 'Analytics' },
+  { key: 'settings',  label: 'Settings',  icon: IconSettings,   routeName: 'Settings' },
+  { key: 'about',     label: 'About',     icon: IconInfoCircle, routeName: 'About' },
 ];
 
 const PILL_PADDING = 8;
@@ -51,7 +54,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
   hasUnsavedSettings,
   onUnsavedSettingsNavigation,
 }) => {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const currentRouteName = state.routeNames[state.index];
 
@@ -98,10 +101,14 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
     default: SPACING.lg,
   });
 
+  const glass = isDark ? GLASS.dark : GLASS.light;
+
   return (
     <View style={[styles.wrapper, { bottom: bottomOffset }]}>
-      <View
-        style={[styles.pill, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
+      <BlurView
+        intensity={glass.blur}
+        tint={isDark ? 'dark' : 'light'}
+        style={[styles.pill, { backgroundColor: glass.floating, borderColor: glass.border }]}
         onLayout={handleLayout}
         accessible={true}
         accessibilityRole="tablist"
@@ -140,19 +147,31 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
                 color={isActive ? colors.onPrimary : colors.textMuted}
                 strokeWidth={2}
               />
-              <Text style={[
-                styles.label,
-                {
-                  color: isActive ? colors.onPrimary : colors.textMuted,
-                  fontFamily: isActive ? FONTS.bold : FONTS.medium,
-                },
-              ]}>
+              {/*
+                5 tabs at maxWidth 94% leave ~54px per tab on a 320dp screen,
+                and "Analytics" measures ~52px at 10px — it wrapped to two
+                lines, growing the pill while the highlight stayed one line
+                tall. Lock to one line and let it shrink instead.
+              */}
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+                maxFontSizeMultiplier={1.2}
+                style={[
+                  styles.label,
+                  {
+                    color: isActive ? colors.onPrimary : colors.textMuted,
+                    fontFamily: isActive ? FONTS.text.semibold : FONTS.text.medium,
+                  },
+                ]}
+              >
                 {item.label}
               </Text>
             </TouchableOpacity>
           );
         })}
-      </View>
+      </BlurView>
     </View>
   );
 };
@@ -167,7 +186,7 @@ const styles = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row',
-    borderRadius: 40,
+    borderRadius: RADII.pill,
     paddingVertical: 8,
     paddingHorizontal: PILL_PADDING,
     alignItems: 'center',
@@ -175,6 +194,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     position: 'relative',
     maxWidth: '94%',
+    overflow: 'hidden',
     // (#11) Unified ELEVATION.lg token (was only ios shadow props)
     ...ELEVATION.lg,
   },
@@ -183,7 +203,7 @@ const styles = StyleSheet.create({
     left: PILL_PADDING,
     top: 8,
     bottom: 8,
-    borderRadius: 32,
+    borderRadius: RADII.pill,
     zIndex: 0,
   },
   tab: {
@@ -192,14 +212,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 32,
+    borderRadius: RADII.pill,
     gap: 4,
     zIndex: 1,
   },
   label: {
-    fontSize: 10,
-    letterSpacing: 0.3,
+    // TEXT.tabLabel — the documented sub-11px exception; see theme.ts
+    ...TEXT.tabLabel,
+    textAlign: 'center',
+    width: '100%',
   },
 });
 

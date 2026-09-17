@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { FONTS, SPACING, ELEVATION } from '../constants/theme';
+import { SPACING, ELEVATION, GLASS, TEXT, RADII } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatCurrency';
 import ProgressCircle from './ProgressCircle';
 
-// (#26) Removed unused `income` prop — savings are shown in the stat row
 interface SummaryCardProps {
   spent: number;
   budget: number;
@@ -18,10 +18,9 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   currency,
   month,
 }) => {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
+  const glass = isDark ? GLASS.dark : GLASS.light;
 
-  // (#1) Clamp percentage: safe divisor guards against Infinity when budget === 0.
-  // Arc is capped at 100% inside ProgressCircle; label in stats row can exceed it.
   const percentage = useMemo(
     () => (budget > 0 ? (spent / budget) * 100 : 0),
     [spent, budget],
@@ -32,7 +31,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   const statusColor = useMemo(() => isOver ? colors.danger : colors.accent, [isOver, colors]);
 
   const a11yValue = useMemo(() => {
-    return `Monthly progress for ${month}: Spent ${currency}${spent.toFixed(0)} of ${currency}${budget.toFixed(0)} budget. ${currency}${remaining.toFixed(0)} ${isOver ? 'over budget' : 'remaining'}.`;
+    return `Monthly progress for ${month}: Spent ${formatCurrencyCompact(spent, currency)} of ${formatCurrencyCompact(budget, currency)} budget. ${formatCurrencyCompact(remaining, currency)} ${isOver ? 'over budget' : 'remaining'}.`;
   }, [month, spent, budget, currency, remaining, isOver]);
 
   return (
@@ -40,15 +39,16 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
       style={[
         styles.container,
         {
-          backgroundColor: colors.surface,
-          borderColor: colors.surfaceLight,
+          backgroundColor: glass.card,
+          borderColor: glass.border,
+          shadowColor: glass.shadow,
         },
       ]}
       accessible={true}
       accessibilityLabel={a11yValue}
     >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textMuted }]}>SUMMARY</Text>
+        <Text style={[styles.title, { color: colors.textDim }]}>SUMMARY</Text>
         <Text style={[styles.month, { color: colors.textDim }]} numberOfLines={1}>{month}</Text>
       </View>
 
@@ -60,17 +60,17 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
         <View style={styles.stats}>
           <View style={styles.spentRow}>
             <Text style={[styles.spentAmount, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-              {currency}{spent.toLocaleString()}
+              {formatCurrency(spent, currency)}
             </Text>
             <Text style={[styles.budgetTotal, { color: colors.textDim }]}>
-              / {currency}{budget.toLocaleString()}
+              / {formatCurrency(budget, currency)}
             </Text>
           </View>
 
           <Text style={[styles.statusLabel, { color: statusColor }]}>
             {isOver
-              ? `${currency}${(spent - budget).toLocaleString()} Over Budget`
-              : `${currency}${remaining.toLocaleString()} Remaining`
+              ? `${formatCurrency(spent - budget, currency)} Over Budget`
+              : `${formatCurrency(remaining, currency)} Remaining`
             }
           </Text>
         </View>
@@ -81,7 +81,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 24,
+    borderRadius: RADII.xl,
     padding: 24,
     marginBottom: SPACING.lg,
     borderWidth: 1,
@@ -95,13 +95,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 10,
-    fontFamily: FONTS.bold,
-    letterSpacing: 1.5,
+    ...TEXT.overline,
   },
   month: {
-    fontSize: 11,
-    fontFamily: FONTS.medium,
+    ...TEXT.labelSm,
   },
   content: {
     flexDirection: 'row',
@@ -121,18 +118,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   spentAmount: {
-    fontSize: 28,
-    fontFamily: FONTS.bold,
+    ...TEXT.moneyHero,
   },
   budgetTotal: {
-    fontSize: 14,
-    fontFamily: FONTS.medium,
+    ...TEXT.money,
     marginLeft: 4,
   },
   statusLabel: {
-    fontSize: 13,
-    fontFamily: FONTS.bold,
-    letterSpacing: 0.3,
+    ...TEXT.money,
   },
 });
 

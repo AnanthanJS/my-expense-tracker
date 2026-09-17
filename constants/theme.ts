@@ -1,5 +1,6 @@
 import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
-import type { ViewStyle } from 'react-native';
+import { Platform } from 'react-native';
+import type { TextStyle, ViewStyle } from 'react-native';
 
 // ---------------------------------------------------------------------------
 // Colors
@@ -94,25 +95,143 @@ export const GUTTER = 20;
 // Radius scale (#7)
 // ---------------------------------------------------------------------------
 
+/**
+ * The original four steps covered 17 distinct literal radii in the codebase,
+ * which is why nothing adopted them. These steps absorb the real usage:
+ * 10 and 12 -> sm, 14 and 16 -> md, 18 and 20 -> lg, 24 -> xl, 32 -> xxl.
+ * Anything meant to read as fully round (dots, FABs, the nav pill) uses
+ * `pill` rather than a literal half-of-height number that silently breaks
+ * when the element is resized.
+ */
 export const RADII = {
+  xs: 8,
   sm: 12,
   md: 16,
-  lg: 24,
+  lg: 20,
+  xl: 24,
+  xxl: 32,
   pill: 999,
 };
 
 // ---------------------------------------------------------------------------
-// Type scale (#8)
+// Typography — Sora (display) + Inter (text)
 // ---------------------------------------------------------------------------
 
-export const TYPE = {
-  display: { fontSize: 28, lineHeight: 34 },
-  title:   { fontSize: 22, lineHeight: 28 },
-  body:    { fontSize: 15, lineHeight: 22 },
-  label:   { fontSize: 13, lineHeight: 18 },
-  overline:{ fontSize: 10, lineHeight: 14, letterSpacing: 1.5 },
-  caption: { fontSize: 11, lineHeight: 16 },
+/**
+ * A two-family pairing: one "speaker" and one "workhorse".
+ *
+ * - **Sora** (display) carries the moments that should feel authored: screen
+ *   titles and the hero numbers. Its wide, confident numerals hold up at
+ *   large sizes where a UI face looks flat.
+ * - **Inter** (text) does every piece of actual reading. It was drawn for
+ *   screens, stays legible at 11px, and ships real tabular figures.
+ *
+ * Never mix the two within one line. Sora stops at 18px; below that Inter
+ * is always correct.
+ */
+const SORA = {
+  regular:   'Sora_400Regular',
+  medium:    'Sora_500Medium',
+  semibold:  'Sora_600SemiBold',
+  bold:      'Sora_700Bold',
+  extrabold: 'Sora_800ExtraBold',
 };
+
+const INTER = {
+  regular:   'Inter_400Regular',
+  medium:    'Inter_500Medium',
+  semibold:  'Inter_600SemiBold',
+  bold:      'Inter_700Bold',
+  extrabold: 'Inter_800ExtraBold',
+};
+
+export const FONTS = {
+  display: SORA,
+  text: INTER,
+};
+
+/**
+ * Semantic text roles. Each bundles family + size + weight + leading +
+ * tracking, so a call site declares *what the text is*, not how to draw it.
+ *
+ * ## Weight ladder (priority, not decoration)
+ *
+ * | Weight | Role                                    |
+ * |--------|-----------------------------------------|
+ * | 800    | the single hero number on a screen      |
+ * | 700    | screen titles, totals                   |
+ * | 600    | section headings, buttons, status       |
+ * | 500    | primary row content, labels             |
+ * | 400    | secondary + meta text                   |
+ *
+ * ## Colour pairing (applied at the call site, since it is theme-dependent)
+ *
+ * | Tone             | Use                                        |
+ * |------------------|--------------------------------------------|
+ * | `text`           | hero numbers, titles, primary row content  |
+ * | `textMuted`      | section headings, supporting copy          |
+ * | `textDim`        | meta, overlines, captions, placeholders    |
+ * | `accent`/`danger`| status only — never for neutral content    |
+ *
+ * Depth comes from this ladder plus the elevation and border behind the text.
+ * Deliberately no `textShadow` anywhere: it softens edges below ~16px and is
+ * invisible against the pure-black dark theme.
+ */
+export const TEXT = {
+  // ── Display (Sora) — titles and hero moments ─────────────────────────────
+  hero:       { fontFamily: SORA.extrabold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8 },
+  display:    { fontFamily: SORA.bold,      fontSize: 28, lineHeight: 34, letterSpacing: -0.6 },
+  title:      { fontFamily: SORA.bold,      fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
+  heading:    { fontFamily: SORA.semibold,  fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
+  subheading: { fontFamily: SORA.semibold,  fontSize: 18, lineHeight: 24, letterSpacing: -0.1 },
+
+  // ── Text (Inter) — everything that gets read ─────────────────────────────
+  bodyLg:     { fontFamily: INTER.regular,  fontSize: 16, lineHeight: 24 },
+  body:       { fontFamily: INTER.regular,  fontSize: 15, lineHeight: 22 },
+  bodySm:     { fontFamily: INTER.regular,  fontSize: 14, lineHeight: 20 },
+
+  /** Primary content inside a row — the thing you scan for. */
+  rowTitle:   { fontFamily: INTER.medium,   fontSize: 14, lineHeight: 20, letterSpacing: -0.1 },
+  /** Field labels and chips. */
+  label:      { fontFamily: INTER.medium,   fontSize: 13, lineHeight: 18 },
+  labelSm:    { fontFamily: INTER.medium,   fontSize: 12, lineHeight: 16 },
+  /** Meta: dates, counts, helper text. */
+  caption:    { fontFamily: INTER.regular,  fontSize: 11, lineHeight: 15 },
+  /**
+   * Section eyebrows. Uppercase needs positive tracking to stay legible;
+   * 0.8 at 11px is the ~1.5% the fintech typography guidance recommends.
+   */
+  overline:   { fontFamily: INTER.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 0.8 },
+  /**
+   * Nav pill only — the one documented sub-11px exception. Five tabs share
+   * ~54px each on a 320dp screen, so 11px would auto-shrink below 10 anyway.
+   */
+  tabLabel:   { fontFamily: INTER.medium,   fontSize: 10, lineHeight: 13, letterSpacing: 0.2 },
+
+  // ── Buttons ──────────────────────────────────────────────────────────────
+  button:     { fontFamily: INTER.semibold, fontSize: 16, lineHeight: 22, letterSpacing: -0.1 },
+  buttonSm:   { fontFamily: INTER.semibold, fontSize: 14, lineHeight: 20 },
+
+  // ── Money (tabular figures) ──────────────────────────────────────────────
+  /**
+   * `tabular-nums` forces every digit to the same advance width. Without it a
+   * column of amounts will not align — a `1` is narrower than an `8` — which
+   * is the detail that separates a financial UI from a generic one.
+   */
+  moneyHero:  { fontFamily: SORA.extrabold, fontSize: 30, lineHeight: 36, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  /** Chart centre labels — display weight, but sized to fit a donut hole. */
+  moneyTitle: { fontFamily: SORA.bold,      fontSize: 22, lineHeight: 28, letterSpacing: -0.4, fontVariant: ['tabular-nums'] },
+  moneyLg:    { fontFamily: INTER.bold,     fontSize: 16, lineHeight: 22, letterSpacing: -0.2, fontVariant: ['tabular-nums'] },
+  money:      { fontFamily: INTER.semibold, fontSize: 14, lineHeight: 20, letterSpacing: -0.1, fontVariant: ['tabular-nums'] },
+  moneySm:    { fontFamily: INTER.medium,   fontSize: 12, lineHeight: 16, fontVariant: ['tabular-nums'] },
+  /** Percentage inside the progress ring. */
+  moneyRing:  { fontFamily: SORA.bold,      fontSize: 18, lineHeight: 22, letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
+
+  // ── Prose — wrapping paragraphs ──────────────────────────────────────────
+  proseLg:    { fontFamily: INTER.regular,  fontSize: 16, lineHeight: 25 },
+  prose:      { fontFamily: INTER.regular,  fontSize: 14, lineHeight: 21 },
+  proseSm:    { fontFamily: INTER.regular,  fontSize: 13, lineHeight: 20 },
+} satisfies Record<string, TextStyle>;
 
 // ---------------------------------------------------------------------------
 // Elevation (#11) — cross-platform shadow tokens
@@ -154,14 +273,60 @@ export const ELEVATION: Record<'sm' | 'md' | 'lg', ElevationLevel> = {
 /** Standard scrim opacity for all modal overlays (was 0.8–0.95). */
 export const SCRIM = 0.5;
 
+/** Ready-made scrim fill, so call sites stop rebuilding the rgba() string. */
+export const SCRIM_COLOR = `rgba(0, 0, 0, ${SCRIM})`;
+
+/**
+ * Blur intensity for scrims drawn as a `BlurView`. Call sites were picking
+ * 40 / 80 / 100 ad hoc, so the same scrim was a different weight per modal.
+ * A full-screen media viewer is the one case that legitimately wants an
+ * opaque backdrop — see SCRIM_BLUR_INTENSITY_OPAQUE.
+ */
+export const SCRIM_BLUR_INTENSITY = Platform.select({ ios: 40, default: 80 }) ?? 80;
+export const SCRIM_BLUR_INTENSITY_OPAQUE = 100;
+
 // ---------------------------------------------------------------------------
-// Fonts
+// Glass tokens — iOS-style frosted glass surfaces
 // ---------------------------------------------------------------------------
 
-export const FONTS = {
-  regular: 'DMSans_400Regular',
-  medium:  'DMSans_500Medium',
-  bold:    'DMSans_700Bold',
+/**
+ * Two distinct surface roles — they were previously conflated into one `card`
+ * token, which is why in-flow cards were invisible:
+ *
+ * - `card`     — a card sitting IN the scroll flow. There is nothing behind it
+ *                but `background`, so translucency buys nothing and costs all
+ *                the contrast. Near-opaque; the *border* draws the edge.
+ * - `floating` — a surface that overlays scrolling content inside a real
+ *                `BlurView` (nav pill, sheets). Here translucency is the point.
+ *
+ * Light-mode borders must be DARKER than the surface they sit on. The old
+ * `rgba(255,255,255,0.55)` border was lighter than the page background, so it
+ * erased the card edge instead of drawing it — cards read at ~1.03:1 against
+ * the page, i.e. not at all.
+ */
+export const GLASS = {
+  light: {
+    /** In-flow card fill — near-opaque white over the Slate-50 page */
+    card: 'rgba(255, 255, 255, 0.94)',
+    /** Hairline edge — slate ink, darker than the surface so it is visible */
+    border: 'rgba(15, 23, 42, 0.09)',
+    /** Translucent fill for BlurView surfaces that overlay content */
+    floating: 'rgba(255, 255, 255, 0.72)',
+    /** Inner highlight for depth (badges, insets) */
+    shine: 'rgba(255, 255, 255, 0.60)',
+    /** BlurView intensity */
+    blur: 45,
+    /** Shadow for raised surfaces — slate-tinted, not blue-violet */
+    shadow: 'rgba(15, 23, 42, 0.10)',
+  },
+  dark: {
+    card: 'rgba(255, 255, 255, 0.055)',
+    border: 'rgba(255, 255, 255, 0.13)',
+    floating: 'rgba(20, 20, 30, 0.60)',
+    shine: 'rgba(255, 255, 255, 0.07)',
+    blur: 65,
+    shadow: 'rgba(0, 0, 0, 0.55)',
+  },
 };
 
 // ---------------------------------------------------------------------------
