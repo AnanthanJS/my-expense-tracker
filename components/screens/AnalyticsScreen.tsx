@@ -7,7 +7,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { GLASS, SPACING, GUTTER, TEXT, RADII, ELEVATION, getCategoryColor } from '../../constants/theme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import { useMonthlyStats } from '../../hooks/useMonthlyStats';
-import { getWeeklyPace, getSixMonthSeries, percentChange } from '../../utils/insights';
+import { getWeeklyPace, getSixMonthSeries } from '../../utils/insights';
 import { formatCurrencyCompact } from '../../utils/formatCurrency';
 import { getMonthName } from '../../utils/storage';
 import MonthPill from '../MonthPill';
@@ -69,10 +69,7 @@ export default function AnalyticsScreen() {
   );
 
   const previousLabel = series.length > 1 ? series[series.length - 2].label : null;
-  const trend = useMemo(
-    () => percentChange(stats.total, stats.previousTotal),
-    [stats.total, stats.previousTotal],
-  );
+  const trend = stats.trendPct;
   const trendUp = trend !== null && trend > 0;
   const trendTone = trendUp ? colors.danger : colors.success;
   const TrendIcon = trendUp ? IconArrowUpRight : IconArrowDownRight;
@@ -108,7 +105,7 @@ export default function AnalyticsScreen() {
                 donut
                 radius={110}
                 innerRadius={72}
-                innerCircleColor={colors.surface}
+                innerCircleColor="transparent"
                 centerLabelComponent={() => (
                   <View style={styles.center}>
                     <Text
@@ -283,8 +280,8 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   dot: { width: 12, height: 12, borderRadius: RADII.pill },
-  dotStack: { flexDirection: 'row', gap: 2, width: 12 },
-  dotSmall: { width: 4, height: 12, borderRadius: 2 },
+  dotStack: { flexDirection: 'row', gap: 1.5, width: 12 },
+  dotSmall: { width: 3, height: 12, borderRadius: 1.5 },
   legendName: { ...TEXT.rowTitle, flex: 1 },
   legendValue: { ...TEXT.money },
   legendShare: { ...TEXT.caption, minWidth: 30, textAlign: 'right' },

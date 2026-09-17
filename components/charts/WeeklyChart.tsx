@@ -40,13 +40,10 @@ const WeeklyChart: React.FC<WeeklyChartProps> = ({ pace, currency }) => {
   return (
     <View style={styles.container}>
       <View style={[styles.plot, { height: PLOT_HEIGHT }]}>
-        {/* Pace line sits behind the bars so tall bars cross it visibly. */}
+        {/* The line sits behind the bars so a tall bar visibly crosses it. */}
         {paceY >= 0 && (
           <View style={[styles.paceWrap, { top: paceY }]} pointerEvents="none">
             <View style={[styles.paceLine, { borderTopColor: colors.danger }]} />
-            <Text style={[styles.paceLabel, { color: colors.danger }]} numberOfLines={1}>
-              pace to stay in budget · {formatCurrencyCompact(weeklyPace, currency)}
-            </Text>
           </View>
         )}
 
@@ -88,6 +85,16 @@ const WeeklyChart: React.FC<WeeklyChartProps> = ({ pace, currency }) => {
             );
           })}
         </View>
+
+        {/* The label, however, is drawn after the bars — behind them it would
+            be unreadable in any month where the later weeks are tall. */}
+        {paceY >= 0 && (
+          <View style={[styles.paceWrap, { top: paceY }]} pointerEvents="none">
+            <Text style={[styles.paceLabel, { color: colors.danger }]} numberOfLines={1}>
+              pace to stay in budget · {formatCurrencyCompact(weeklyPace, currency)}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={[styles.axis, { borderTopColor: colors.surfaceLight }]}>

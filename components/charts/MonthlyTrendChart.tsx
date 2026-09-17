@@ -36,9 +36,6 @@ const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ points, budget, c
         {budgetY >= 0 && (
           <View style={[styles.budgetWrap, { top: budgetY }]} pointerEvents="none">
             <View style={[styles.budgetLine, { borderTopColor: colors.textDim }]} />
-            <Text style={[styles.budgetLabel, { color: colors.textDim }]} numberOfLines={1}>
-              budget {formatCurrencyCompact(budget, currency)}
-            </Text>
           </View>
         )}
 
@@ -65,6 +62,17 @@ const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ points, budget, c
             );
           })}
         </View>
+
+        {/* Drawn after the bars, and left-aligned: the rightmost bar is the
+            selected month, which is both always present and usually the
+            tallest, so a right-aligned label lands straight on top of it. */}
+        {budgetY >= 0 && (
+          <View style={[styles.budgetWrap, { top: budgetY }]} pointerEvents="none">
+            <Text style={[styles.budgetLabel, { color: colors.textDim }]} numberOfLines={1}>
+              budget {formatCurrencyCompact(budget, currency)}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={[styles.axis, { borderTopColor: colors.surfaceLight }]}>
@@ -111,7 +119,7 @@ const styles = StyleSheet.create({
 
   budgetWrap: { position: 'absolute', left: 0, right: 0 },
   budgetLine: { borderTopWidth: 1.5, borderStyle: 'dashed' },
-  budgetLabel: { ...TEXT.caption, textAlign: 'right', marginTop: 2 },
+  budgetLabel: { ...TEXT.caption, textAlign: 'left', marginTop: 2 },
 
   axis: {
     flexDirection: 'row',
