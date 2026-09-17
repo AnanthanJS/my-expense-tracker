@@ -72,10 +72,17 @@ const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
   }, [currentRouteName, navigation, state.routes]);
 
   const numTabs = state.routes.length;
-  // (#2) Use `flex: 1` on each tab so tabs fill the pill equally — the computed
-  // tabWidth then matches the actual rendered width, eliminating highlight drift.
-  // We still need the px value for the animated highlight position.
-  const usableWidth = containerWidth - (PILL_PADDING * 2) - (TAB_GAP * (numTabs - 1));
+  /**
+   * (#2) Tabs are `flex: 1`, so the computed width has to match what flexbox
+   * actually produces or the highlight drifts further off-centre with each tab.
+   *
+   * `onLayout` measures the inner row, which already sits inside the bar's
+   * horizontal padding — so only the gaps come off here. Subtracting the
+   * padding again made every tab 3.2px too narrow and left the last tab's
+   * highlight ~13px adrift, which is what showed up as the content sitting
+   * off-centre inside the pill.
+   */
+  const usableWidth = containerWidth - (TAB_GAP * (numTabs - 1));
   const tabWidth = containerWidth > 0 ? usableWidth / numTabs : 0;
 
   const translateX = position.interpolate({
