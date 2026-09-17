@@ -18,7 +18,7 @@ const EXPORT_VERSION = 1;
 const sanitizeFilePart = (value: string) =>
   value.replace(/[^a-z0-9-]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 
-const getExportName = (extension: 'json' | 'pdf') => {
+const getExportName = (extension: 'json' | 'pdf' | 'csv') => {
   const date = new Date().toISOString().slice(0, 10);
   return `expense-export-${sanitizeFilePart(date)}.${extension}`;
 };
@@ -185,6 +185,44 @@ export const exportExpensesAsJson = async (expenses: Expense[], recurringExpense
   await Sharing.shareAsync(exportFile.uri, {
     mimeType: 'application/json',
     dialogTitle: 'Export expenses as JSON',
+  });
+};
+
+/**
+ * RFC 4180 quoting: wrap in quotes and double any quote inside. Without this a
+ * description containing a comma silently shifts every later column.
+ */
+const csvCell = (value: string | number): string => {
+  const text = String(value ?? '');
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+/**
+ * Spreadsheet-friendly export. The JSON export is the round-trippable backup;
+ * this one is for opening in Excel or Sheets, so it is flat and human-readable
+ * rather than faithful to the internal shape.
+ */
+export const exportExpensesAsCsv = async (expenses: Expense[]) => {
+  await assertCanShare();
+
+  const header = ['Date', 'Description', 'Category', 'Amount'];
+  const rows = [...expenses]
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((e) => [e.date.split('T')[0], e.description, e.category, e.amount.toFixed(2)]);
+
+  // BOM so Excel opens UTF-8 (currency symbols) correctly instead of mojibake.
+  const csv = '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+
+  const exportFile = new File(Paths.cache, getExportName('csv'));
+  if (exportFile.exists) {
+    exportFile.delete();
+  }
+  exportFile.create({ overwrite: true });
+  exportFile.write(csv);
+
+  await Sharing.shareAsync(exportFile.uri, {
+    mimeType: 'text/csv',
+    dialogTitle: 'Export expenses as CSV',
   });
 };
 

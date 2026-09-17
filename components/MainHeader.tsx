@@ -1,26 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { GUTTER, GLASS, TEXT, RADII } from '../constants/theme';
+import { GUTTER, GLASS, TEXT, RADII, SPACING } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { useAppTheme } from '../hooks/useAppTheme';
-import MonthPicker from './MonthPicker';
 
 interface MainHeaderProps {
   title: string;
-  /** Static strapline. Ignored when `showMonth` is set. */
+  /** Optional strapline, used by screens that are not month-scoped. */
   subtitle?: string;
-  /**
-   * (C1) Data screens show the globally selected month here instead of a
-   * static strapline. Home, Expenses and Analytics all read the same
-   * `selectedDate`, so the month has to be visible wherever it applies —
-   * previously it was a Home-only control and the other two silently showed
-   * every expense ever recorded.
-   */
-  showMonth?: boolean;
 }
 
-const MainHeader: React.FC<MainHeaderProps> = ({ title, subtitle, showMonth = false }) => {
-  const { settings, selectedDate, setSelectedDate } = useApp();
+/**
+ * Screen title and the active currency.
+ *
+ * The month moved out of here into `MonthPill`, rendered as the first row of
+ * each data screen's content: it scopes everything below it, so it belongs
+ * with the content rather than in the chrome.
+ */
+const MainHeader: React.FC<MainHeaderProps> = ({ title, subtitle }) => {
+  const { settings } = useApp();
   const { colors, isDark } = useAppTheme();
   const glass = isDark ? GLASS.dark : GLASS.light;
 
@@ -36,19 +34,18 @@ const MainHeader: React.FC<MainHeaderProps> = ({ title, subtitle, showMonth = fa
       worth doing, but it is a layout change, not a styling one.
     */
     <View
-      style={[styles.header, {
-        backgroundColor: glass.card,
-        borderBottomWidth: 1,
-        borderBottomColor: glass.border,
-      }]}
+      style={[styles.header, { backgroundColor: colors.background }]}
     >
       <View style={styles.textContainer}>
-        <Text style={[styles.appTitle, { color: colors.primary }]} numberOfLines={1}>
+        <Text
+          style={[styles.appTitle, { color: colors.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
           {title}
         </Text>
-        {showMonth ? (
-          <MonthPicker compact selectedDate={selectedDate} onDateChange={setSelectedDate} />
-        ) : subtitle ? (
+        {subtitle ? (
           <Text style={[styles.appSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
             {subtitle}
           </Text>
@@ -70,14 +67,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: GUTTER,
-    paddingVertical: 12,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
     gap: 12,
   },
   textContainer: {
     flex: 1,
   },
   appTitle: {
-    ...TEXT.title,
+    // Matches the Settings screen's large title so every tab opens the same way.
+    ...TEXT.display,
   },
   appSubtitle: {
     ...TEXT.labelSm,

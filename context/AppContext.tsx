@@ -7,7 +7,8 @@ import {
   loadSettings, 
   saveSettings,
   loadRecurringExpenses,
-  saveRecurringExpenses
+  saveRecurringExpenses,
+  clearAllData
 } from '../utils/storage';
 import type { Expense, Settings, RecurringExpense } from '../utils/storage';
 
@@ -38,6 +39,7 @@ type AppAction =
   | { type: 'SET_SELECTED_DATE'; date: Date }
   | { type: 'ADD_EXPENSE'; expense: Expense }
   | { type: 'EDIT_EXPENSE'; expense: Expense }
+  | { type: 'RECATEGORISE_EXPENSES'; from: string; to: string }
   | { type: 'DELETE_EXPENSE'; id: string }
   | { type: 'RESTORE_EXPENSE'; expense: Expense }
   | { type: 'RESTORE_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
@@ -49,6 +51,7 @@ type AppAction =
   | { type: 'SET_LOADING'; isLoading: boolean }
   | { type: 'SHOW_FEEDBACK'; message: string; feedbackType: 'success' | 'error'; onUndo?: () => void }
   | { type: 'HIDE_FEEDBACK' }
+  | { type: 'ERASE_ALL' }
   | { type: 'COMPLETE_ONBOARDING' };
 
 // 3. Reducer
@@ -60,6 +63,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, selectedDate: action.date };
     case 'ADD_EXPENSE': {
       const updatedExpenses = [action.expense, ...state.expenses];
+      saveExpenses(updatedExpenses);
+      return { ...state, expenses: updatedExpenses };
+    }
+    /**
+     * Moves every expense filed under one category to another. Used when a
+     * category is renamed or deleted — without it those expenses keep a label
+     * that no longer exists, and silently vanish from the category breakdown.
+     */
+    case 'RECATEGORISE_EXPENSES': {
+      if (action.from === action.to) return state;
+      const updatedExpenses = state.expenses.map((e) =>
+        e.category === action.from ? { ...e, category: action.to } : e,
+      );
       saveExpenses(updatedExpenses);
       return { ...state, expenses: updatedExpenses };
     }
@@ -130,6 +146,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
       saveSettings(action.settings);
       return { ...state, settings: action.settings };
     }
+    /** Factory reset: expenses, recurring bills and settings all go. */
+    case 'ERASE_ALL': {
+      clearAllData();
+      return {
+        ...state,
+        expenses: [],
+        recurringExpenses: [],
+        // Onboarding stays marked as seen: someone wiping their data is not
+        // asking to be walked through the app again.
+        settings: { ...defaultSettings, hasSeenOnboarding: true },
+      };
+    }
     case 'COMPLETE_ONBOARDING': {
       const newSettings = { ...state.settings, hasSeenOnboarding: true };
       saveSettings(newSettings);
@@ -158,6 +186,7 @@ interface AppContextType extends AppState {
   setSelectedDate: (date: Date) => void;
   addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
   editExpense: (expense: Expense) => Promise<void>;
+  recategoriseExpenses: (from: string, to: string) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   addRecurringExpense: (expense: Omit<RecurringExpense, 'id'>) => Promise<void>;
   editRecurringExpense: (expense: RecurringExpense) => Promise<void>;
@@ -166,6 +195,7 @@ interface AppContextType extends AppState {
   updateSettings: (settings: Settings) => Promise<void>;
   showFeedback: (message: string, type?: 'success' | 'error', onUndo?: () => void) => void;
   hideFeedback: () => void;
+  eraseAllData: () => Promise<void>;
   completeOnboarding: () => void;
 }
 
@@ -248,6 +278,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [showFeedback]);
 
+  const recategoriseExpenses = useCallback(async (from: string, to: string) => {
+    dispatch({ type: 'RECATEGORISE_EXPENSES', from, to });
+  }, []);
+
   const deleteExpense = useCallback(async (id: string) => {
     try {
       // Captured before the dispatch so Undo can restore the exact record.
@@ -313,6 +347,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [showFeedback]);
 
+  const eraseAllData = useCallback(async () => {
+    dispatch({ type: 'ERASE_ALL' });
+    showFeedback('All data erased.');
+  }, [showFeedback]);
+
   const completeOnboarding = useCallback(() => {
     dispatch({ type: 'COMPLETE_ONBOARDING' });
   }, []);
@@ -324,6 +363,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedDate,
         addExpense,
         editExpense,
+        recategoriseExpenses,
         deleteExpense,
         addRecurringExpense,
         editRecurringExpense,
@@ -332,6 +372,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateSettings,
         showFeedback,
         hideFeedback,
+        eraseAllData,
         completeOnboarding,
       }}
     >

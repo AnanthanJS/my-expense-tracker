@@ -30,6 +30,10 @@ export interface Settings {
   hasSeenOnboarding: boolean;
   categories: string[]; // Dynamic categories
   categoryBudgets?: Record<string, number>;
+  /** Category -> group name, for the Categories & budgets screen. */
+  categoryGroups?: Record<string, string>;
+  /** ISO timestamp of the last successful backup, for the About screen. */
+  lastBackupAt?: string;
   categorizationRules?: Record<string, string>;
 }
 
@@ -118,6 +122,15 @@ export const saveSettings = async (settings: Settings): Promise<void> => {
   } catch (e) {
     console.error('Error saving settings', e);
   }
+};
+
+/**
+ * Removes every key this app owns. Used by "Erase all data", which is a
+ * factory reset rather than a data-only clear — a wipe that kept your budget
+ * and categories would not be the promise the button makes.
+ */
+export const clearAllData = async (): Promise<void> => {
+  await AsyncStorage.multiRemove([EXPENSES_KEY, SETTINGS_KEY, RECURRING_EXPENSES_KEY]);
 };
 
 export const getMonthName = (date: Date): string => {

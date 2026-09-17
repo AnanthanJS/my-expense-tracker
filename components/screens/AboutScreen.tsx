@@ -1,224 +1,398 @@
-import React from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
+  TouchableOpacity,
+  TextInput,
   StyleSheet,
+  Modal,
+  Alert,
 } from 'react-native';
 import {
   IconCoin,
-  IconChartBar,
+  IconLock,
+  IconDownload,
+  IconDatabase,
+  IconRefresh,
+  IconTrash,
+  IconChevronRight,
+  IconTrendingUp,
   IconCalendar,
   IconTarget,
   IconSearch,
-  IconDeviceFloppy,
-  IconLock,
-  IconHeart,
+  IconCurrencyDollar,
+  IconCloudOff,
 } from '@tabler/icons-react-native';
 import type { IconProps } from '@tabler/icons-react-native';
 import appConfig from '../../app.json';
-import { GUTTER, TEXT, RADII, ELEVATION } from '../../constants/theme';
+import { GUTTER, SPACING, TEXT, RADII, ELEVATION, GLASS, SCRIM_COLOR, tint, calloutTint, calloutBorder } from '../../constants/theme';
+import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
+import { exportExpensesAsCsv, exportExpensesAsJson, pickExpensesJson } from '../../utils/expenseTransfer';
+import { formatDate } from '../../utils/formatDate';
 
-// (#30) All Tabler icons; reworded Rupee-first copy
-const FEATURES: { icon: React.FC<IconProps>; title: string; desc: string }[] = [
-  { icon: IconCoin,         title: 'Your currency',        desc: 'Currency of your choice, ₹ by default.' },
-  { icon: IconChartBar,     title: 'Category Breakdown',   desc: 'Visual bar charts for each spending category.' },
-  { icon: IconCalendar,     title: 'Monthly View',         desc: 'Browse past months and track trends over time.' },
-  { icon: IconTarget,       title: 'Budget Goals',         desc: 'Set income & budget limits and monitor progress.' },
-  { icon: IconSearch,       title: 'Smart Search',         desc: 'Quickly filter expenses by description or category.' },
-  { icon: IconDeviceFloppy, title: 'Offline Storage',      desc: 'All data stored locally on your device, no sign-up needed.' },
+const FEATURES: { icon: React.FC<IconProps>; label: string }[] = [
+  { icon: IconTrendingUp, label: 'Category breakdowns' },
+  { icon: IconCalendar, label: 'Month-by-month history' },
+  { icon: IconTarget, label: 'Income & budget goals' },
+  { icon: IconSearch, label: 'Search & filters' },
+  { icon: IconCurrencyDollar, label: 'Any currency you like' },
+  { icon: IconCloudOff, label: 'Works fully offline' },
 ];
 
+const BUILT_WITH = ['Expo', 'React Native', 'AsyncStorage', 'Reanimated', 'Sora', 'Inter'];
+
+/** Typed to confirm an irreversible wipe. */
+const ERASE_WORD = 'ERASE';
+
 const AboutScreen: React.FC = () => {
-  const { colors } = useAppTheme();
-  const navbarHeight = useNavbarHeight(); // (#4)
+  const { colors, isDark } = useAppTheme();
+  const glass = isDark ? GLASS.dark : GLASS.light;
+  const navbarHeight = useNavbarHeight();
+  const {
+    expenses,
+    recurringExpenses,
+    settings,
+    updateSettings,
+    importExpenses,
+    showFeedback,
+    eraseAllData,
+  } = useApp();
+
+  const [eraseOpen, setEraseOpen] = useState(false);
+  const [eraseConfirm, setEraseConfirm] = useState('');
+
+  const lastBackup = useMemo(
+    () => (settings.lastBackupAt ? formatDate(settings.lastBackupAt) : 'never'),
+    [settings.lastBackupAt],
+  );
+
+  const handleCsv = useCallback(async () => {
+    if (expenses.length === 0) {
+      showFeedback('Nothing to export yet.', 'error');
+      return;
+    }
+    try {
+      await exportExpensesAsCsv(expenses);
+    } catch (e) {
+      showFeedback(`Export failed: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
+    }
+  }, [expenses, showFeedback]);
+
+  const handleBackup = useCallback(async () => {
+    if (expenses.length === 0 && recurringExpenses.length === 0) {
+      showFeedback('Nothing to back up yet.', 'error');
+      return;
+    }
+    try {
+      await exportExpensesAsJson(expenses, recurringExpenses);
+      // Recorded only after the share sheet resolves, so a cancelled export
+      // does not leave a backup date that never happened.
+      updateSettings({ ...settings, lastBackupAt: new Date().toISOString() });
+    } catch (e) {
+      showFeedback(`Backup failed: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
+    }
+  }, [expenses, recurringExpenses, settings, updateSettings, showFeedback]);
+
+  const handleRestore = useCallback(async () => {
+    try {
+      const imported = await pickExpensesJson();
+      if (!imported) return;
+      const count = imported.expenses.length + imported.recurringExpenses.length;
+      Alert.alert(
+        'Restore backup',
+        `${count} item${count === 1 ? '' : 's'} found. Merge with what you have, or replace it?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Merge', onPress: () => importExpenses(imported, 'merge') },
+          { text: 'Replace', style: 'destructive', onPress: () => importExpenses(imported, 'replace') },
+        ],
+      );
+    } catch (e) {
+      showFeedback(`Restore failed: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
+    }
+  }, [importExpenses, showFeedback]);
+
+  const confirmErase = useCallback(() => {
+    if (eraseConfirm.trim().toUpperCase() !== ERASE_WORD) return;
+    eraseAllData();
+    setEraseOpen(false);
+    setEraseConfirm('');
+  }, [eraseConfirm, eraseAllData]);
+
+  const dataRows = [
+    { icon: IconDownload, label: 'Export as CSV', sub: null, onPress: handleCsv, danger: false },
+    { icon: IconDatabase, label: 'Back up to a file', sub: `Last backup: ${lastBackup}`, onPress: handleBackup, danger: false },
+    { icon: IconRefresh, label: 'Restore from a backup', sub: null, onPress: handleRestore, danger: false },
+    { icon: IconTrash, label: 'Erase all data', sub: null, onPress: () => setEraseOpen(true), danger: true },
+  ];
 
   return (
-    <ScrollView
-      style={[styles.scroll, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingBottom: navbarHeight }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* (#17) Tablet: cap at 640px, centered */}
-      <View style={styles.maxWidthWrapper}>
-        {/* Hero */}
-        <View style={styles.hero}>
-          {/* (#30) Replaced 💰 emoji with IconCoin */}
-          <View style={[styles.appIconWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
-            <IconCoin size={40} color={colors.primary} strokeWidth={1.5} />
-          </View>
-          <Text style={[styles.appName, { color: colors.primary }]}>My Expense Tracker</Text>
-          <Text style={[styles.appVersion, { color: colors.textDim }]}>
-            Version {appConfig.expo.version}  •  Built with React Native
-          </Text>
-          <Text style={[styles.tagline, { color: colors.textMuted }]}>
-            Your personal finance companion — simple, fast & private.
-          </Text>
-        </View>
-
-        {/* Features */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>FEATURES</Text>
-          {FEATURES.map((f) => {
-            const Icon = f.icon;
-            return (
-              <View
-                key={f.title}
-                style={[styles.featureRow, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}
+    <>
+      <ScrollView
+        style={[styles.scroll, { backgroundColor: colors.background }]}
+        contentContainerStyle={[styles.content, { paddingBottom: navbarHeight + SPACING.lg }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.maxWidth}>
+          {/* ── App ──────────────────────────────────────────────────────── */}
+          <View style={[styles.card, styles.appCard, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}>
+            <View style={[styles.appIcon, { backgroundColor: tint(colors.primary, '1A') }]}>
+              <IconCoin size={30} color={colors.primary} strokeWidth={1.8} />
+            </View>
+            <View style={styles.appText}>
+              <Text
+                style={[styles.appName, { color: colors.text }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
               >
-                <View style={[styles.featureIconWrap, { backgroundColor: colors.surfaceLight }]}>
-                  <Icon size={22} color={colors.primary} strokeWidth={1.5} />
-                </View>
-                <View style={styles.featureText}>
-                  <Text style={[styles.featureTitle, { color: colors.text }]}>{f.title}</Text>
-                  <Text style={[styles.featureDesc, { color: colors.textMuted }]}>{f.desc}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* Privacy */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>PRIVACY</Text>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
-            <View style={styles.privacyRow}>
-              {/* (#30) Replaced 🔒 with IconLock */}
-              <IconLock size={18} color={colors.textMuted} strokeWidth={1.5} style={{ marginTop: 1 }} />
-              <Text style={[styles.privacyText, { color: colors.textMuted }]}>
-                All your data stays on this device. No accounts, no cloud, no tracking.
-                Your financial data is completely private.
+                My Expense Tracker
+              </Text>
+              <Text style={[styles.appTagline, { color: colors.textMuted }]}>
+                Your personal finance companion — simple, fast and private.
               </Text>
             </View>
           </View>
-        </View>
 
-        {/* Credits */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textDim }]}>BUILT WITH</Text>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
-            {['Expo & React Native', 'AsyncStorage', 'DM Sans (Google Fonts)', 'React Native Paper'].map((tech) => (
-              <Text key={tech} style={[styles.techItem, { color: colors.textMuted }]}>• {tech}</Text>
+          {/* ── Privacy ──────────────────────────────────────────────────── */}
+          <View style={[styles.card, styles.appCard, {
+            backgroundColor: calloutTint(colors.primary, isDark),
+            borderColor: calloutBorder(colors.primary, isDark),
+          }]}>
+            {/* A stronger tint than the card: reusing the card's own alpha
+                left the tile at 1.11:1 against it in light mode, too faint to
+                read as a tile at all. */}
+            <View style={[styles.appIcon, { backgroundColor: tint(colors.primary, '3D') }]}>
+              <IconLock size={26} color={colors.primary} strokeWidth={1.8} />
+            </View>
+            <View style={styles.appText}>
+              <Text style={[styles.privacyTitle, { color: colors.text }]}>Everything stays on this phone</Text>
+              <Text style={[styles.appTagline, { color: colors.textMuted }]}>
+                No account, no cloud, no tracking. If you uninstall the app your data goes with it — so keep a backup.
+              </Text>
+            </View>
+          </View>
+
+          {/* ── Your data ────────────────────────────────────────────────── */}
+          <View style={[styles.card, styles.listCard, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}>
+            <Text style={[styles.cardLabel, { color: colors.textDim }]}>Your data</Text>
+            {dataRows.map((row, index) => {
+              const Icon = row.icon;
+              const tone = row.danger ? colors.danger : colors.text;
+              return (
+                <TouchableOpacity
+                  key={row.label}
+                  style={[
+                    styles.row,
+                    index > 0 && { borderTopWidth: 1, borderTopColor: colors.surfaceLight },
+                  ]}
+                  onPress={row.onPress}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel={row.sub ? `${row.label}. ${row.sub}` : row.label}
+                >
+                  <Icon size={22} color={row.danger ? colors.danger : colors.textMuted} strokeWidth={2} />
+                  <View style={styles.rowText}>
+                    <Text style={[styles.rowLabel, { color: tone }]} numberOfLines={1}>{row.label}</Text>
+                    {row.sub && (
+                      <Text style={[styles.rowSub, { color: colors.textDim }]} numberOfLines={1}>{row.sub}</Text>
+                    )}
+                  </View>
+                  <IconChevronRight size={18} color={row.danger ? colors.danger : colors.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* ── What it does ─────────────────────────────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: colors.textDim }]}>What it does</Text>
+          <View style={styles.grid}>
+            {FEATURES.map(({ icon: Icon, label }) => (
+              <View
+                key={label}
+                style={[styles.tile, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}
+              >
+                <Icon size={22} color={colors.primary} strokeWidth={2} />
+                <Text style={[styles.tileLabel, { color: colors.text }]}>{label}</Text>
+              </View>
             ))}
           </View>
-        </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          {/* (#30) Replaced ❤️ emoji with IconHeart */}
-          <IconHeart size={14} color={colors.textDim} strokeWidth={2} fill={colors.textDim} />
-          <Text style={[styles.footerText, { color: colors.textDim }]}>Made for everyday budgeting</Text>
+          {/* ── Built with ───────────────────────────────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: colors.textDim }]}>Built with</Text>
+          <View style={styles.chips}>
+            {BUILT_WITH.map((name) => (
+              <View key={name} style={[styles.chip, { backgroundColor: glass.card, borderColor: glass.border }]}>
+                <Text style={[styles.chipText, { color: colors.textMuted }]}>{name}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={[styles.version, { color: colors.textDim }]}>
+            Version {appConfig.expo.version}
+          </Text>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+
+      {/* ── Erase confirmation ─────────────────────────────────────────────
+          Typed rather than a plain Alert: this clears expenses, recurring
+          bills and settings with no undo, so it should take more than a
+          mis-tap to reach. */}
+      <Modal visible={eraseOpen} transparent animationType="fade" onRequestClose={() => setEraseOpen(false)}>
+        <View style={[styles.overlay, { backgroundColor: SCRIM_COLOR }]}>
+          <View style={[styles.dialog, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
+            <View style={[styles.appIcon, { backgroundColor: tint(colors.danger, '1A'), alignSelf: 'center' }]}>
+              <IconTrash size={26} color={colors.danger} strokeWidth={2} />
+            </View>
+            <Text style={[styles.dialogTitle, { color: colors.text }]}>Erase all data?</Text>
+            <Text style={[styles.dialogBody, { color: colors.textMuted }]}>
+              This removes every expense, recurring bill and setting on this phone. It cannot be undone,
+              and a backup taken now is the only way back.
+            </Text>
+            <Text style={[styles.dialogPrompt, { color: colors.textDim }]}>
+              Type {ERASE_WORD} to confirm
+            </Text>
+            <TextInput
+              style={[styles.dialogInput, { borderColor: colors.surfaceLight, color: colors.text }]}
+              value={eraseConfirm}
+              onChangeText={setEraseConfirm}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder={ERASE_WORD}
+              placeholderTextColor={colors.textDim}
+              accessibilityLabel={`Type ${ERASE_WORD} to confirm erasing all data`}
+            />
+            <View style={styles.dialogActions}>
+              <TouchableOpacity
+                style={[styles.dialogBtn, { borderColor: colors.surfaceLight, borderWidth: 1 }]}
+                onPress={() => { setEraseOpen(false); setEraseConfirm(''); }}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+              >
+                <Text style={[styles.dialogBtnText, { color: colors.textMuted }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.dialogBtn,
+                  { backgroundColor: colors.danger },
+                  eraseConfirm.trim().toUpperCase() !== ERASE_WORD && styles.dialogBtnDisabled,
+                ]}
+                onPress={confirmErase}
+                disabled={eraseConfirm.trim().toUpperCase() !== ERASE_WORD}
+                accessibilityRole="button"
+                accessibilityLabel="Erase all data"
+              >
+                <Text style={[styles.dialogBtnText, { color: colors.onDanger }]}>Erase</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
-  content: {
-    // (#3) GUTTER — was SPACING.lg (16), now 20
-    padding: GUTTER,
-    alignItems: 'stretch',
-  },
-  // (#17) Tablet: max 640px centered
-  maxWidthWrapper: {
-    maxWidth: 640,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  hero: {
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingTop: 8,
-  },
-  appIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: RADII.xl,
+  content: { paddingHorizontal: GUTTER, paddingTop: SPACING.sm },
+  maxWidth: { maxWidth: 640, width: '100%', alignSelf: 'center' },
+
+  card: {
+    borderRadius: RADII.lg,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-    // (#11) was a hand-rolled copy of ELEVATION.md
-    ...ELEVATION.md,
+    marginBottom: SPACING.lg,
+    ...ELEVATION.sm,
   },
-  appName: {
-    ...TEXT.title,
-    marginBottom: 4,
-  },
-  appVersion: {
-    ...TEXT.caption,
-    marginBottom: 10,
-  },
-  tagline: {
-    ...TEXT.prose,
-    textAlign: 'center',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    ...TEXT.overline,
-    marginBottom: 12,
-  },
-  featureRow: {
+  appCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-    borderRadius: RADII.md,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
+    alignItems: 'center',
+    gap: SPACING.lg,
+    padding: SPACING.lg,
   },
-  featureIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: RADII.sm,
+  appIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: RADII.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  featureText: { flex: 1 },
-  featureTitle: {
-    ...TEXT.rowTitle,
-    marginBottom: 2,
-  },
-  featureDesc: {
-    ...TEXT.proseSm,
-  },
-  card: {
-    borderRadius: RADII.md,
-    padding: 16,
-    borderWidth: 1,
-    gap: 6,
-  },
-  privacyRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  privacyText: {
-    flex: 1,
-    ...TEXT.proseSm,
-  },
-  techItem: {
-    ...TEXT.proseSm,
-    lineHeight: 22,
-  },
-  footer: {
+  appText: { flex: 1, gap: 4 },
+  appName: { ...TEXT.subheading },
+  privacyTitle: { ...TEXT.rowTitle },
+  appTagline: { ...TEXT.prose },
+
+  listCard: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
+  cardLabel: { ...TEXT.labelSm, paddingTop: SPACING.lg, paddingBottom: SPACING.xs },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.md,
+    minHeight: 60,
+  },
+  rowText: { flex: 1, gap: 1 },
+  rowLabel: { ...TEXT.bodyLg },
+  rowSub: { ...TEXT.caption },
+
+  sectionLabel: { ...TEXT.labelSm, marginBottom: SPACING.md, marginLeft: SPACING.xs },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  tile: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minHeight: 108,
+    borderRadius: RADII.lg,
+    borderWidth: 1,
+    padding: SPACING.lg,
+    justifyContent: 'space-between',
+    ...ELEVATION.sm,
+  },
+  tileLabel: { ...TEXT.rowTitle },
+
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  chip: {
+    borderRadius: RADII.pill,
+    borderWidth: 1,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+  },
+  chipText: { ...TEXT.label },
+  version: { ...TEXT.caption, marginTop: SPACING.lg, textAlign: 'center' },
+
+  overlay: { flex: 1, justifyContent: 'center', padding: SPACING.xl },
+  dialog: {
+    borderRadius: RADII.xl,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    gap: SPACING.md,
+  },
+  dialogTitle: { ...TEXT.heading, textAlign: 'center' },
+  dialogBody: { ...TEXT.prose, textAlign: 'center' },
+  dialogPrompt: { ...TEXT.labelSm, marginTop: SPACING.sm },
+  dialogInput: {
+    borderWidth: 1,
+    borderRadius: RADII.md,
+    paddingHorizontal: SPACING.lg,
+    minHeight: 52,
+    ...TEXT.bodyLg,
+  },
+  dialogActions: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.sm },
+  dialogBtn: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: RADII.md,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 8,
-    marginBottom: 12,
   },
-  footerText: {
-    ...TEXT.caption,
-  },
+  dialogBtnDisabled: { opacity: 0.45 },
+  dialogBtnText: { ...TEXT.button },
 });
 
 export default React.memo(AboutScreen);

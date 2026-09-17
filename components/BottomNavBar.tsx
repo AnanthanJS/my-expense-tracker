@@ -4,12 +4,10 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Platform,
   Animated,
 } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
-import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IconHome,
@@ -42,17 +40,10 @@ const NAV_ITEMS: NavItem[] = [
 const PILL_PADDING = 8;
 const TAB_GAP = 4;
 
-interface BottomNavBarProps extends MaterialTopTabBarProps {
-  hasUnsavedSettings: boolean;
-  onUnsavedSettingsNavigation: (routeName: string) => void;
-}
-
-const BottomNavBar: React.FC<BottomNavBarProps> = ({
+const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
   state,
   navigation,
   position,
-  hasUnsavedSettings,
-  onUnsavedSettingsNavigation,
 }) => {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -73,21 +64,25 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
       canPreventDefault: true,
     });
 
-    if (currentRouteName === 'Settings' && routeName !== 'Settings' && hasUnsavedSettings) {
-      onUnsavedSettingsNavigation(routeName);
-      return;
-    }
-
+    // (A7) The Settings unsaved-changes interception is gone: Settings now
+    // saves as you edit, so there is nothing to lose by navigating away.
     if (currentRouteName !== routeName && !event.defaultPrevented) {
       navigation.navigate(routeName);
     }
-  }, [currentRouteName, hasUnsavedSettings, navigation, onUnsavedSettingsNavigation, state.routes]);
+  }, [currentRouteName, navigation, state.routes]);
 
   const numTabs = state.routes.length;
-  // (#2) Use `flex: 1` on each tab so tabs fill the pill equally — the computed
-  // tabWidth then matches the actual rendered width, eliminating highlight drift.
-  // We still need the px value for the animated highlight position.
-  const usableWidth = containerWidth - (PILL_PADDING * 2) - (TAB_GAP * (numTabs - 1));
+  /**
+   * (#2) Tabs are `flex: 1`, so the computed width has to match what flexbox
+   * actually produces or the highlight drifts further off-centre with each tab.
+   *
+   * `onLayout` measures the inner row, which already sits inside the bar's
+   * horizontal padding — so only the gaps come off here. Subtracting the
+   * padding again made every tab 3.2px too narrow and left the last tab's
+   * highlight ~13px adrift, which is what showed up as the content sitting
+   * off-centre inside the pill.
+   */
+  const usableWidth = containerWidth - (TAB_GAP * (numTabs - 1));
   const tabWidth = containerWidth > 0 ? usableWidth / numTabs : 0;
 
   const translateX = position.interpolate({
@@ -95,20 +90,23 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
     outputRange: state.routes.map((_, i) => i * (tabWidth + TAB_GAP)),
   });
 
-  const bottomOffset = Platform.select({
-    ios: Math.max(insets.bottom, SPACING.lg),
-    android: insets.bottom > 0 ? insets.bottom + SPACING.sm : SPACING.lg,
-    default: SPACING.lg,
-  });
+  const bottomOffset = Math.max(insets.bottom, SPACING.sm);
 
   const glass = isDark ? GLASS.dark : GLASS.light;
 
   return (
-    <View style={[styles.wrapper, { bottom: bottomOffset }]}>
-      <BlurView
-        intensity={glass.blur}
-        tint={isDark ? 'dark' : 'light'}
-        style={[styles.pill, { backgroundColor: glass.floating, borderColor: glass.border }]}
+    <View
+      style={[
+        styles.bar,
+        {
+          backgroundColor: colors.surface,
+          borderTopColor: glass.border,
+          paddingBottom: bottomOffset,
+        },
+      ]}
+    >
+      <View
+        style={styles.row}
         onLayout={handleLayout}
         accessible={true}
         accessibilityRole="tablist"
@@ -171,39 +169,34 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({
             </TouchableOpacity>
           );
         })}
-      </BlurView>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
+  bar: {
     position: 'absolute',
     left: 0,
     right: 0,
-    alignItems: 'center',
-    pointerEvents: 'box-none',
-  },
-  pill: {
-    flexDirection: 'row',
-    borderRadius: RADII.pill,
-    paddingVertical: 8,
+    bottom: 0,
+    borderTopWidth: 1,
+    paddingTop: SPACING.sm,
     paddingHorizontal: PILL_PADDING,
+    ...ELEVATION.md,
+  },
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: TAB_GAP,
-    borderWidth: 1,
     position: 'relative',
-    maxWidth: '94%',
-    overflow: 'hidden',
-    // (#11) Unified ELEVATION.lg token (was only ios shadow props)
-    ...ELEVATION.lg,
   },
   animatedPill: {
     position: 'absolute',
-    left: PILL_PADDING,
-    top: 8,
-    bottom: 8,
-    borderRadius: RADII.pill,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: RADII.md,
     zIndex: 0,
   },
   tab: {
@@ -211,8 +204,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: RADII.pill,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADII.md,
     gap: 4,
     zIndex: 1,
   },

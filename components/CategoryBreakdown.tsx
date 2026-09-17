@@ -1,146 +1,171 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { SPACING, GLASS, TEXT, RADII, getCategoryColor } from '../constants/theme';
+import { IconChevronRight } from '@tabler/icons-react-native';
+import { SPACING, GLASS, TEXT, RADII, ELEVATION, getCategoryColor, getBudgetTone } from '../constants/theme';
+import { GROUP_TINTS, UNGROUPED_LABEL, getCategoryIcon, resolveGroup } from '../constants/categories';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';
 import { formatCurrencyCompact } from '../utils/formatCurrency';
+import type { CategorySlice } from '../hooks/useMonthlyStats';
 
 interface CategoryBreakdownProps {
-  expenses: { category: string; amount: number }[];
-  totalSpent: number;
+  byCategory: CategorySlice[];
   currency: string;
+  onSeeAll: () => void;
+  /** Rows shown before the "All N categories" hand-off. */
+  limit?: number;
 }
 
+/**
+ * Share of spend per category.
+ *
+ * The bar sits on its own line under the name and amount rather than squeezed
+ * between them: at six rows the old inline layout left the bar about 40% of
+ * the row width, which is too little to compare lengths by eye — which is the
+ * only thing a bar is for.
+ */
 const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
-  expenses,
-  totalSpent,
+  byCategory,
   currency,
+  onSeeAll,
+  limit = 6,
 }) => {
   const { colors, isDark } = useAppTheme();
   const { settings } = useApp();
   const glass = isDark ? GLASS.dark : GLASS.light;
-  
-  const sortedCategories = useMemo(() => {
-    const categoryTotals: Record<string, number> = {};
-    expenses.forEach((e) => {
-      categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
-    });
-    return Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
-  }, [expenses]);
 
-  if (expenses.length === 0) return null;
+  if (byCategory.length === 0) return null;
+
+  const rows = byCategory.slice(0, limit);
+  const groups = settings.categoryGroups || {};
+  const largest = byCategory[0]?.amount ?? 0;
 
   return (
-    <Animated.View 
+    <Animated.View
       entering={FadeIn.duration(250)}
       exiting={FadeOut.duration(200)}
       layout={LinearTransition.duration(200)}
-      style={[styles.container, { 
-        backgroundColor: glass.card, 
-        borderColor: glass.border,
-        shadowColor: glass.shadow,
-        elevation: 3
-      }]}
-      accessible={true}
-      accessibilityLabel={`Spending breakdown by category. Total spent: ${formatCurrencyCompact(totalSpent, currency)}`}
+      style={[styles.container, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}
     >
-      <Text style={[styles.title, { color: colors.textDim }]}>BY CATEGORY</Text>
-      <View style={styles.list}>
-        {sortedCategories.map(([category, amount]) => {
-          const budgetLimit = settings.categoryBudgets?.[category];
-          let percentage = totalSpent > 0 ? (amount / totalSpent) * 100 : 0;
-          let barColor = getCategoryColor(category);
-          let displayAmount = formatCurrencyCompact(amount, currency);
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>By category</Text>
+        <Text style={[styles.subtitle, { color: colors.textDim }]}>Share of spend</Text>
+      </View>
 
-          if (budgetLimit && budgetLimit > 0) {
-            percentage = (amount / budgetLimit) * 100;
-            displayAmount = `${formatCurrencyCompact(amount, currency)} / ${budgetLimit.toLocaleString()}`;
-            if (percentage >= 100) {
-              barColor = colors.danger;
-            } else if (percentage >= 80) {
-              barColor = '#f59e0b'; // warning color
-            }
-          }
-          const barWidth = Math.min(percentage, 100);
+      <View style={styles.list}>
+        {rows.map(({ category, amount }) => {
+          const Icon = getCategoryIcon(category);
+          const group = resolveGroup(category, groups);
+          const tone = GROUP_TINTS[group] ?? GROUP_TINTS[UNGROUPED_LABEL];
+
+          const limitAmount = settings.categoryBudgets?.[category];
+          const hasLimit = Boolean(limitAmount && limitAmount > 0);
+
+          // Bars are scaled against the largest category so the biggest row
+          // always fills the track — relative size is the comparison that
+          // matters here. A category with its own limit switches to the
+          // budget ramp instead, where absolute progress is the point.
+          const width = hasLimit
+            ? Math.min((amount / (limitAmount as number)) * 100, 100)
+            : largest > 0 ? (amount / largest) * 100 : 0;
+          const barColor = hasLimit
+            ? getBudgetTone(amount, limitAmount as number, colors)
+            : getCategoryColor(category);
 
           return (
-            <View 
-              key={category} 
+            <View
+              key={category}
               style={styles.item}
-              accessible={true}
-              accessibilityLabel={`${category}: ${displayAmount}, which is ${Math.round(percentage)}% of ${budgetLimit ? 'budget limit' : 'total spending'}.`}
+              accessible
+              accessibilityLabel={
+                hasLimit
+                  ? `${category}: ${formatCurrencyCompact(amount, currency)} of a ${formatCurrencyCompact(limitAmount as number, currency)} limit`
+                  : `${category}: ${formatCurrencyCompact(amount, currency)}`
+              }
             >
-              <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-                {category}
-              </Text>
-              <View style={[styles.barContainer, { backgroundColor: colors.surfaceLight }]} aria-hidden={true}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${barWidth}%`,
-                      backgroundColor: barColor,
-                    },
-                  ]}
-                />
+              <View style={styles.itemTop}>
+                <View style={[styles.tile, { backgroundColor: tone.bg }]}>
+                  <Icon size={20} color={tone.fg} strokeWidth={2} />
+                </View>
+                <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+                  {category}
+                </Text>
+                <Text style={[styles.amount, { color: colors.text }]} numberOfLines={1}>
+                  {formatCurrencyCompact(amount, currency)}
+                </Text>
               </View>
-              <Text
-                style={[styles.amount, { color: colors.textMuted }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {displayAmount}
-              </Text>
+              <View style={[styles.track, { backgroundColor: colors.surfaceLight }]}>
+                <View style={[styles.fill, { width: `${width}%`, backgroundColor: barColor }]} />
+              </View>
             </View>
           );
         })}
       </View>
+
+      {byCategory.length > limit && (
+        <TouchableOpacity
+          style={[styles.seeAll, { backgroundColor: colors.surfaceLight }]}
+          onPress={onSeeAll}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`See all ${byCategory.length} categories`}
+        >
+          <Text style={[styles.seeAllText, { color: colors.primary }]}>
+            All {byCategory.length} categories
+          </Text>
+          <IconChevronRight size={18} color={colors.primary} strokeWidth={2.4} />
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: RADII.xl,
+    borderRadius: RADII.lg,
     padding: SPACING.lg,
     marginBottom: SPACING.lg,
     borderWidth: 1,
+    ...ELEVATION.sm,
   },
-  title: {
-    ...TEXT.overline,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: SPACING.sm,
     marginBottom: SPACING.lg,
   },
-  list: {
-    gap: 12,
-  },
-  item: {
+  title: { ...TEXT.subheading },
+  subtitle: { ...TEXT.caption },
+  list: { gap: SPACING.lg },
+  item: { gap: SPACING.sm },
+  itemTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SPACING.md,
   },
-  categoryName: {
-    ...TEXT.labelSm,
-    width: 80,
+  tile: {
+    width: 40,
+    height: 40,
+    borderRadius: RADII.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  barContainer: {
-    flex: 1,
-    height: 12,
-    borderRadius: RADII.pill,
-    overflow: 'hidden',
+  name: { ...TEXT.rowTitle, flex: 1 },
+  amount: { ...TEXT.money },
+  track: { height: 8, borderRadius: RADII.pill, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: RADII.pill },
+  seeAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    minHeight: 52,
+    borderRadius: RADII.md,
+    marginTop: SPACING.lg,
   },
-  bar: {
-    height: '100%',
-    borderRadius: RADII.pill,
-  },
-  amount: {
-    ...TEXT.moneySm,
-    minWidth: 64,
-    maxWidth: 120,
-    flexShrink: 0,
-    textAlign: 'right',
-  },
+  seeAllText: { ...TEXT.button },
 });
 
 export default React.memo(CategoryBreakdown);

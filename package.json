@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run typecheck",
     "sync:expo-version": "node ./scripts/sync-expo-version.mjs",
+    "icons": "node ./scripts/generate-icons.mjs",
     "release": "semantic-release"
   },
   "dependencies": {
@@ -63,6 +64,7 @@
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "semantic-release": "^25.0.3",
+    "sharp": "^0.35.4",
     "typescript": "~5.9.2"
   },
   "private": true
