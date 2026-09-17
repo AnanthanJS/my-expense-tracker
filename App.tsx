@@ -58,7 +58,7 @@ const TAB_CONFIG = {
   Home:      { title: 'Expense Tracker' },
   Expenses:  { title: 'Expenses' },
   Analytics: { title: 'Analytics' },
-  About:     { title: 'About', subtitle: 'App info & features' },
+  About:     { title: 'About' },
 };
 
 const ScreenFallback = () => (
@@ -106,7 +106,7 @@ const SettingsWithHeader = () => (
 
 const AboutWithHeader = () => (
   <Suspense fallback={<ScreenFallback />}>
-    <MainHeader title={TAB_CONFIG.About.title} subtitle={TAB_CONFIG.About.subtitle} />
+    <MainHeader title={TAB_CONFIG.About.title} />
     <AboutScreen />
   </Suspense>
 );

@@ -7,7 +7,8 @@ import {
   loadSettings, 
   saveSettings,
   loadRecurringExpenses,
-  saveRecurringExpenses
+  saveRecurringExpenses,
+  clearAllData
 } from '../utils/storage';
 import type { Expense, Settings, RecurringExpense } from '../utils/storage';
 
@@ -50,6 +51,7 @@ type AppAction =
   | { type: 'SET_LOADING'; isLoading: boolean }
   | { type: 'SHOW_FEEDBACK'; message: string; feedbackType: 'success' | 'error'; onUndo?: () => void }
   | { type: 'HIDE_FEEDBACK' }
+  | { type: 'ERASE_ALL' }
   | { type: 'COMPLETE_ONBOARDING' };
 
 // 3. Reducer
@@ -144,6 +146,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
       saveSettings(action.settings);
       return { ...state, settings: action.settings };
     }
+    /** Factory reset: expenses, recurring bills and settings all go. */
+    case 'ERASE_ALL': {
+      clearAllData();
+      return {
+        ...state,
+        expenses: [],
+        recurringExpenses: [],
+        // Onboarding stays marked as seen: someone wiping their data is not
+        // asking to be walked through the app again.
+        settings: { ...defaultSettings, hasSeenOnboarding: true },
+      };
+    }
     case 'COMPLETE_ONBOARDING': {
       const newSettings = { ...state.settings, hasSeenOnboarding: true };
       saveSettings(newSettings);
@@ -181,6 +195,7 @@ interface AppContextType extends AppState {
   updateSettings: (settings: Settings) => Promise<void>;
   showFeedback: (message: string, type?: 'success' | 'error', onUndo?: () => void) => void;
   hideFeedback: () => void;
+  eraseAllData: () => Promise<void>;
   completeOnboarding: () => void;
 }
 
@@ -332,6 +347,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [showFeedback]);
 
+  const eraseAllData = useCallback(async () => {
+    dispatch({ type: 'ERASE_ALL' });
+    showFeedback('All data erased.');
+  }, [showFeedback]);
+
   const completeOnboarding = useCallback(() => {
     dispatch({ type: 'COMPLETE_ONBOARDING' });
   }, []);
@@ -352,6 +372,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateSettings,
         showFeedback,
         hideFeedback,
+        eraseAllData,
         completeOnboarding,
       }}
     >
