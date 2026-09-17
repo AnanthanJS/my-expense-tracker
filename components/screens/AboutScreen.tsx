@@ -26,7 +26,7 @@ import {
 } from '@tabler/icons-react-native';
 import type { IconProps } from '@tabler/icons-react-native';
 import appConfig from '../../app.json';
-import { GUTTER, SPACING, TEXT, RADII, ELEVATION, GLASS, SCRIM_COLOR, tint } from '../../constants/theme';
+import { GUTTER, SPACING, TEXT, RADII, ELEVATION, GLASS, SCRIM_COLOR, tint, calloutTint, calloutBorder } from '../../constants/theme';
 import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
@@ -158,8 +158,11 @@ const AboutScreen: React.FC = () => {
           </View>
 
           {/* ── Privacy ──────────────────────────────────────────────────── */}
-          <View style={[styles.card, styles.appCard, { backgroundColor: tint(colors.primary, '0F'), borderColor: tint(colors.primary, '33') }]}>
-            <View style={[styles.appIcon, { backgroundColor: tint(colors.primary, '1A') }]}>
+          <View style={[styles.card, styles.appCard, {
+            backgroundColor: calloutTint(colors.primary, isDark),
+            borderColor: calloutBorder(colors.primary, isDark),
+          }]}>
+            <View style={[styles.appIcon, { backgroundColor: calloutTint(colors.primary, isDark) }]}>
               <IconLock size={26} color={colors.primary} strokeWidth={1.8} />
             </View>
             <View style={styles.appText}>

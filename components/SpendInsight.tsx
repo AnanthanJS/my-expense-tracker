@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { IconAlertTriangle } from '@tabler/icons-react-native';
-import { SPACING, TEXT, RADII, tint } from '../constants/theme';
+import { SPACING, TEXT, RADII, tint, calloutTint, calloutBorder } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { formatCurrencyCompact } from '../utils/formatCurrency';
 import type { SpendDriver } from '../utils/insights';
@@ -20,12 +20,15 @@ interface SpendInsightProps {
  * banner could never surface.
  */
 const SpendInsight: React.FC<SpendInsightProps> = ({ driver, currency, onView }) => {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const share = Math.round(driver.share * 100);
 
   return (
     <View
-      style={[styles.container, { backgroundColor: tint(colors.danger, '12'), borderColor: tint(colors.danger, '33') }]}
+      style={[styles.container, {
+        backgroundColor: calloutTint(colors.danger, isDark),
+        borderColor: calloutBorder(colors.danger, isDark),
+      }]}
       accessible
       accessibilityLabel={`${driver.category} is driving this month: ${formatCurrencyCompact(driver.amount, currency)}, ${share} percent of everything you spent`}
     >

@@ -348,6 +348,25 @@ export function tint(color: string, alpha = '1A'): string {
   return color.length === 7 ? `${color}${alpha}` : color;
 }
 
+/**
+ * Tint for a callout card — one that should sit *above* the normal card
+ * surface, like the privacy note or the spend insight.
+ *
+ * The alpha has to differ by theme. A 6% wash of blue reads as a soft
+ * highlight on a near-white page, but on the pure-black dark theme the same
+ * wash composites *darker* than an ordinary card, so the card meant to stand
+ * out is the one that recedes. Dark needs roughly three times the alpha to
+ * clear the surface it sits on.
+ */
+export function calloutTint(color: string, isDark: boolean): string {
+  return tint(color, isDark ? '2E' : '14');
+}
+
+/** Matching border for a callout card. */
+export function calloutBorder(color: string, isDark: boolean): string {
+  return tint(color, isDark ? '52' : '33');
+}
+
 // ---------------------------------------------------------------------------
 // Category colors
 // ---------------------------------------------------------------------------
