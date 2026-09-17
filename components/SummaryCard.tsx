@@ -132,7 +132,12 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
 
       <View style={styles.stats}>
         <View style={styles.stat}>
-          <Text style={[styles.statLabel, { color: colors.textDim }]} numberOfLines={1}>
+          <Text
+            style={[styles.statLabel, { color: colors.textDim }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
             Transactions
           </Text>
           <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1}>
@@ -143,7 +148,12 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
         <View style={[styles.statDivider, { backgroundColor: colors.surfaceLight }]} />
 
         <View style={styles.stat}>
-          <Text style={[styles.statLabel, { color: colors.textDim }]} numberOfLines={1}>
+          <Text
+            style={[styles.statLabel, { color: colors.textDim }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
             Avg / expense
           </Text>
           <Text
@@ -159,7 +169,12 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
         <View style={[styles.statDivider, { backgroundColor: colors.surfaceLight }]} />
 
         <View style={styles.stat}>
-          <Text style={[styles.statLabel, { color: colors.textDim }]} numberOfLines={1}>
+          <Text
+            style={[styles.statLabel, { color: colors.textDim }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
             Top category
           </Text>
           <Text
@@ -226,7 +241,7 @@ const styles = StyleSheet.create({
 
   stats: { flexDirection: 'row', alignItems: 'stretch' },
   stat: { flex: 1, gap: 2 },
-  statDivider: { width: 1, marginHorizontal: SPACING.md },
+  statDivider: { width: 1, marginHorizontal: SPACING.sm },
   statLabel: { ...TEXT.caption },
   statValue: { ...TEXT.moneyLg },
 });

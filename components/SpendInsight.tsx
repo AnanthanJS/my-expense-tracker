@@ -34,7 +34,9 @@ const SpendInsight: React.FC<SpendInsightProps> = ({ driver, currency, onView })
       </View>
 
       <View style={styles.body}>
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+        {/* Two lines: the headline runs ~208px against ~188px of body width
+            at 360dp, so pinning it to one line would clip the category name. */}
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
           {driver.category} is driving this month
         </Text>
         <Text style={[styles.detail, { color: colors.textMuted }]}>

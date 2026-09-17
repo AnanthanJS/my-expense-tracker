@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     borderRadius: RADII.lg,
     borderWidth: 1,
     paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xs,
+    paddingBottom: SPACING.sm,
     marginBottom: SPACING.lg,
     ...ELEVATION.sm,
   },
