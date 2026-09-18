@@ -34,6 +34,7 @@ import {
   IconPlus,
   IconEdit,
   IconChevronRight,
+  IconRepeat,
 } from '@tabler/icons-react-native';
 import { FONTS, GUTTER, GLASS, TEXT, RADII, SCRIM_COLOR, SCRIM_COLOR_OPAQUE, getCategoryColor } from '../../constants/theme';
 import type { Expense, RecurringExpense } from '../../utils/storage';
@@ -45,9 +46,11 @@ import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import ExpenseForm from '../ExpenseForm';
+import type { ExpenseDraft } from '../ExpenseForm';
+import type { RecurrenceInput } from '../../context/AppContext';
 import MonthPill from '../MonthPill';
 import { useExpenseToast } from '../../hooks/useExpenseToast';
-import { nextDueAfter } from '../../utils/recurrence';
+import { billKey, nextDueAfter } from '../../utils/recurrence';
 import type { Frequency } from '../../utils/recurrence';
 import { isCompleteDate } from '../../utils/dateInput';
 import RecurrenceFields from '../RecurrenceFields';
@@ -84,9 +87,11 @@ interface ExpenseRowProps {
   onViewReceipt?: (uri: string) => void;
   colors: ThemeColors;
   isDark: boolean;
+  /** True when a recurring bill covers this expense. */
+  isRecurring: boolean;
 }
 
-const ExpenseRow = React.memo(({ item, currency, onDelete, onEdit, onViewReceipt, colors, isDark }: ExpenseRowProps) => {
+const ExpenseRow = React.memo(({ item, currency, onDelete, onEdit, onViewReceipt, colors, isDark, isRecurring }: ExpenseRowProps) => {
   const glass = isDark ? GLASS.dark : GLASS.light;
   const categoryColor = getCategoryColor(item.category);
 
@@ -108,7 +113,11 @@ const ExpenseRow = React.memo(({ item, currency, onDelete, onEdit, onViewReceipt
         style={styles.itemMain}
         onPress={() => onEdit(item)}
         accessibilityRole="button"
-        accessibilityLabel={`${item.description}, ${formatCurrency(item.amount, currency)}, ${item.category}`}
+        accessibilityLabel={
+          isRecurring
+            ? `${item.description}, ${formatCurrency(item.amount, currency)}, ${item.category}, repeating`
+            : `${item.description}, ${formatCurrency(item.amount, currency)}, ${item.category}`
+        }
         accessibilityHint="Opens this expense for editing"
       >
         <View style={[styles.categoryPill, { backgroundColor: categoryColor + '28' }]}>
@@ -118,9 +127,19 @@ const ExpenseRow = React.memo(({ item, currency, onDelete, onEdit, onViewReceipt
           <Text style={[styles.itemDesc, { color: colors.text }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
             {item.description}
           </Text>
-          <Text style={[styles.itemMeta, { color: colors.textDim }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-            {item.category} · {formatDate(item.date)}
-          </Text>
+          <View style={styles.itemMetaRow}>
+            {/*
+              A quiet mark, not a badge: it answers "is this one of my regulars"
+              at a glance without competing with the amount, which is what the
+              eye is actually scanning this list for.
+            */}
+            {isRecurring && (
+              <IconRepeat size={13} color={colors.primary} strokeWidth={2.4} />
+            )}
+            <Text style={[styles.itemMeta, { color: colors.textDim }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              {item.category} · {formatDate(item.date)}
+            </Text>
+          </View>
         </View>
       </PressableScale>
       <View style={styles.itemRight}>
@@ -228,7 +247,7 @@ type SortOption = 'newest' | 'oldest' | 'high-to-low' | 'low-to-high';
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const RecentExpensesScreen: React.FC = () => {
   const {
-    expenses, recurringExpenses, settings, selectedDate, setSelectedDate, deleteExpense, editExpense, addExpense, importExpenses, showFeedback,
+    expenses, recurringExpenses, settings, selectedDate, setSelectedDate, deleteExpense, saveExpenseWithRecurrence, importExpenses, showFeedback,
     addRecurringExpense, editRecurringExpense, deleteRecurringExpense,
   } = useApp();
   const { colors, isDark } = useAppTheme();
@@ -466,13 +485,35 @@ const RecentExpensesScreen: React.FC = () => {
     setRecurringModalVisible(false);
   };
 
+  /**
+   * Which expenses repeat. Matched two ways because there are two ways to get
+   * there: the toggle on the expense form leaves a recurringId behind, while a
+   * bill built from an existing expense only shares its description, category
+   * and amount.
+   */
+  const recurringMarks = useMemo(() => {
+    const ids = new Set(recurringExpenses.map((r) => r.id));
+    const keys = new Set(
+      recurringExpenses.map((r) => billKey(r.description, r.category, r.amount)),
+    );
+    return { ids, keys };
+  }, [recurringExpenses]);
+
+  const isExpenseRecurring = useCallback(
+    (expense: Expense) =>
+      (expense.recurringId ? recurringMarks.ids.has(expense.recurringId) : false) ||
+      recurringMarks.keys.has(billKey(expense.description, expense.category, expense.amount)),
+    [recurringMarks],
+  );
+
   const renderExpense = useCallback(
     ({ item }: ListRenderItemInfo<Expense>) => (
       <ExpenseRow item={item} currency={settings.currency} onDelete={deleteExpense}
         onEdit={setEditingExpense}
-        onViewReceipt={setViewingReceiptUri} colors={colors} isDark={isDark} />
+        onViewReceipt={setViewingReceiptUri} colors={colors} isDark={isDark}
+        isRecurring={isExpenseRecurring(item)} />
     ),
-    [settings.currency, deleteExpense, colors, isDark],
+    [settings.currency, deleteExpense, colors, isDark, isExpenseRecurring],
   );
 
   const renderRecurring = useCallback(
@@ -483,14 +524,25 @@ const RecentExpensesScreen: React.FC = () => {
     [settings.currency, colors, isDark, deleteRecurringExpense, openRecurringForm],
   );
 
-  const handleAdd = useCallback(async (draft: Parameters<typeof addExpense>[0]) => {
+  const handleAdd = useCallback(async (draft: ExpenseDraft) => {
+    const { recurrence, ...expense } = draft;
     try {
-      await addExpense(draft);
-      announceSaved(draft);
+      await saveExpenseWithRecurrence(expense, recurrence ?? null);
+      announceSaved(expense, recurrence?.frequency);
     } catch {
       announceFailed(() => { handleAdd(draft); });
     }
-  }, [addExpense, announceSaved, announceFailed]);
+  }, [saveExpenseWithRecurrence, announceSaved, announceFailed]);
+
+  const handleSaveExpense = useCallback(async (updated: Expense & { recurrence?: RecurrenceInput | null }) => {
+    const { recurrence, ...expense } = updated;
+    try {
+      await saveExpenseWithRecurrence(expense, recurrence ?? null);
+      setEditingExpense(null);
+    } catch {
+      announceFailed(() => { handleSaveExpense(updated); });
+    }
+  }, [saveExpenseWithRecurrence, announceFailed]);
 
   const hasFiltersApplied = hasActiveFilters || searchQuery.length > 0;
 
@@ -634,7 +686,7 @@ const RecentExpensesScreen: React.FC = () => {
         editing={editingExpense}
         onClose={() => setEditingExpense(null)}
         onAdd={handleAdd}
-        onSave={(updated) => { editExpense(updated); setEditingExpense(null); }}
+        onSave={handleSaveExpense}
       />
 
       {/* Filter Modal */}
@@ -922,6 +974,7 @@ const styles = StyleSheet.create({
   categoryPill: { width: 32, height: 32, borderRadius: RADII.sm, alignItems: 'center', justifyContent: 'center' },
   categoryDot: { width: 10, height: 10, borderRadius: RADII.pill },
   itemMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  itemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   itemInfo: { flex: 1 },
   itemDesc: { ...TEXT.rowTitle },
   itemMeta: { ...TEXT.caption, marginTop: 2 },

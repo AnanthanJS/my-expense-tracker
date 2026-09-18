@@ -3,6 +3,7 @@ import { useToast } from '../providers/ToastProvider';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils/formatCurrency';
 import type { Expense } from '../utils/storage';
+import type { Frequency } from '../utils/recurrence';
 
 /**
  * Toast announcements for saving an expense.
@@ -19,7 +20,11 @@ export function useExpenseToast() {
    * Confirms a saved expense, warning instead when that save is what pushed
    * the category past its limit — the more useful thing to say at that moment.
    */
-  const announceSaved = useCallback((expense: Omit<Expense, 'id'>) => {
+  const announceSaved = useCallback((
+    expense: Omit<Expense, 'id'>,
+    /** Set when the save also created or updated a repeat rule. */
+    frequency?: Frequency | null,
+  ) => {
     const meta = `${formatCurrency(expense.amount, settings.currency)} · ${expense.category}`;
     const limit = settings.categoryBudgets?.[expense.category];
 
@@ -44,7 +49,13 @@ export function useExpenseToast() {
       }
     }
 
-    toast.show({ variant: 'success', title: 'Expense added', meta });
+    toast.show({
+      variant: 'success',
+      // The recurrence is the part worth confirming — it is the half of the
+      // save with no row in the list to look at afterwards.
+      title: frequency ? `Expense added · repeats ${frequency}` : 'Expense added',
+      meta,
+    });
   }, [toast, expenses, settings.currency, settings.categoryBudgets]);
 
   const announceFailed = useCallback((onRetry: () => void) => {

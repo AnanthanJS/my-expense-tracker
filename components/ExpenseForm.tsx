@@ -8,16 +8,30 @@ import {
   Modal,
   ScrollView,
   KeyboardAvoidingView,
+  Switch,
+  Alert,
+  AccessibilityInfo,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { contentExiting, rowEntering } from '../constants/motion';
+import {
+  contentExiting,
+  listLayout,
+  revealEntering,
+  revealExiting,
+  rowEntering,
+} from '../constants/motion';
+import { nextDueAfter } from '../utils/recurrence';
+import type { Frequency } from '../utils/recurrence';
+import { isCompleteDate } from '../utils/dateInput';
+import RecurrenceFields from './RecurrenceFields';
 import { IconPlus, IconX, IconCamera, IconPhoto, IconCheck } from '@tabler/icons-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
-import { TEXT, RADII, SCRIM_COLOR, getCategoryColor } from '../constants/theme';
+import { TEXT, RADII, SPACING, SCRIM_COLOR, getCategoryColor } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';
 import type { Expense } from '../utils/storage';
+import type { RecurrenceInput } from '../context/AppContext';
 import { toLocalISODate } from '../utils/formatDate';
 import PressableScale from './PressableScale';
 
@@ -27,6 +41,11 @@ export interface ExpenseDraft {
   category: string;
   date: string;
   receiptUri?: string;
+  /**
+   * Set only while the repeat toggle is on. Null clears any rule the expense
+   * had, so a toggle switched back off never leaves stale values behind.
+   */
+  recurrence?: RecurrenceInput | null;
 }
 
 interface ExpenseFormProps {
@@ -80,7 +99,7 @@ const DATE_SHORTCUTS: { label: string; resolve: () => string }[] = [
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, editing = null, onSave }) => {
   const isEditing = Boolean(editing);
   const { colors } = useAppTheme();
-  const { showFeedback, settings, updateSettings } = useApp();
+  const { showFeedback, settings, updateSettings, recurringExpenses } = useApp();
 
   const [description, setDescription] = useState('');
   const [amount, setAmount]           = useState('');
@@ -89,6 +108,23 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
   const [dateError, setDateError]     = useState<string | null>(null);
   const [receiptUri, setReceiptUri]   = useState<string | null>(null);
   const [isPickingImage, setIsPickingImage] = useState(false);
+
+  // Recurrence — a modifier on the expense, so it lives at the bottom of the
+  // form and below the fields it modifies.
+  const [repeat, setRepeat] = useState(false);
+  const [repeatFrequency, setRepeatFrequency] = useState<Frequency>('monthly');
+  const [repeatNextDue, setRepeatNextDue] = useState('');
+  const [repeatError, setRepeatError] = useState<string | null>(null);
+  /** Once the user edits the due date, the frequency stops moving it. */
+  const [repeatDueDirty, setRepeatDueDirty] = useState(false);
+
+  /** The rule this expense already has, if any. Read once, never linked. */
+  const existingRule = useMemo(
+    () => (editing?.recurringId
+      ? recurringExpenses.find((r) => r.id === editing.recurringId) ?? null
+      : null),
+    [editing?.recurringId, recurringExpenses],
+  );
 
   // (C5) Load the edited record when the sheet opens, and clear back to a
   // blank draft when it opens for a new expense.
@@ -100,15 +136,29 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
       setCategory(editing.category);
       setDate(editing.date.split('T')[0]);
       setReceiptUri(editing.receiptUri ?? null);
+      // An expense that already repeats opens with the toggle on and the
+      // rule's own values, not a freshly computed default.
+      const rule = editing.recurringId
+        ? recurringExpenses.find((r) => r.id === editing.recurringId)
+        : undefined;
+      setRepeat(Boolean(rule));
+      setRepeatFrequency(rule?.frequency ?? 'monthly');
+      setRepeatNextDue(rule?.nextDueDate ?? '');
+      setRepeatDueDirty(Boolean(rule));
     } else {
       setDescription('');
       setAmount('');
       setCategory(settings.categories[0] || 'Other');
       setDate(toLocalISODate(new Date()));
       setReceiptUri(null);
+      setRepeat(false);
+      setRepeatFrequency('monthly');
+      setRepeatNextDue('');
+      setRepeatDueDirty(false);
     }
     setDateError(null);
-  }, [visible, editing, settings.categories]);
+    setRepeatError(null);
+  }, [visible, editing, settings.categories, recurringExpenses]);
 
   /**
    * Guards against editing a category out from under an open sheet.
@@ -155,6 +205,52 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
     } else {
       setDateError(null);
     }
+  }, []);
+
+  /**
+   * Turning the toggle on seeds the due date from the expense's own date plus
+   * one interval — the next occurrence, never the one being logged.
+   */
+  const handleToggleRepeat = useCallback((next: boolean) => {
+    setRepeatError(null);
+
+    if (!next) {
+      // Switching off an expense that already has a rule destroys it, so ask.
+      if (existingRule) {
+        Alert.alert(
+          'Stop repeating?',
+          'This deletes the recurring bill for this expense. The expense itself is kept.',
+          [
+            { text: 'Keep repeating', style: 'cancel' },
+            {
+              text: 'Delete rule',
+              style: 'destructive',
+              onPress: () => { setRepeat(false); setRepeatDueDirty(false); },
+            },
+          ],
+        );
+        return;
+      }
+      setRepeat(false);
+      setRepeatDueDirty(false);
+      return;
+    }
+
+    setRepeat(true);
+    if (!repeatDueDirty) setRepeatNextDue(nextDueAfter(date, repeatFrequency));
+    AccessibilityInfo.announceForAccessibility('Frequency and next due date added');
+  }, [existingRule, repeatDueDirty, date, repeatFrequency]);
+
+  const handleRepeatFrequencyChange = useCallback((frequency: Frequency) => {
+    setRepeatFrequency(frequency);
+    setRepeatError(null);
+    if (!repeatDueDirty) setRepeatNextDue(nextDueAfter(date, frequency));
+  }, [repeatDueDirty, date]);
+
+  const handleRepeatDueChange = useCallback((value: string) => {
+    setRepeatDueDirty(true);
+    setRepeatNextDue(value);
+    setRepeatError(null);
   }, []);
 
   const handlePickImage = async () => {
@@ -205,6 +301,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
     setDate(toLocalISODate(new Date()));
     setDateError(null);
     setReceiptUri(null);
+    setRepeat(false);
+    setRepeatNextDue('');
+    setRepeatError(null);
+    setRepeatDueDirty(false);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -231,6 +331,32 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
       return;
     }
 
+    if (repeat) {
+      if (!isCompleteDate(repeatNextDue)) {
+        setRepeatError('Enter the next due date as YYYY-MM-DD.');
+        return;
+      }
+      if (repeatNextDue === date) {
+        // The expense being saved already counts as this month's spend. A rule
+        // due on the same day would show it as still owed, counting it twice.
+        setRepeatError(
+          'The next due date must be after this expense. This one is already recorded.',
+        );
+        return;
+      }
+      const due = new Date(repeatNextDue);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (due <= today) {
+        setRepeatError('The next due date must be in the future.');
+        return;
+      }
+      if (due <= new Date(date)) {
+        setRepeatError('The next due date must be after this expense.');
+        return;
+      }
+    }
+
     let finalReceiptUri = undefined;
     if (receiptUri) {
       try {
@@ -251,6 +377,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
       date,
       // An untouched receipt keeps its existing URI rather than being dropped.
       receiptUri: finalReceiptUri ?? (receiptUri ?? undefined),
+      // Null rather than undefined when off: it is an instruction to clear any
+      // rule, not an absence of opinion.
+      recurrence: repeat ? { frequency: repeatFrequency, nextDueDate: repeatNextDue } : null,
     };
 
     if (editing && onSave) {
@@ -274,7 +403,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
 
     resetForm();
     onClose();
-  }, [description, amount, category, date, receiptUri, editing, onSave, onAdd, showFeedback, resetForm, onClose, settings, updateSettings]);
+  }, [description, amount, category, date, receiptUri, repeat, repeatFrequency, repeatNextDue, editing, onSave, onAdd, showFeedback, resetForm, onClose, settings, updateSettings]);
 
   return (
     <Modal
@@ -497,20 +626,73 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                 )}
               </View>
 
-              {/* Submit Button */}
-              <PressableScale
-                style={[styles.submitButton, { backgroundColor: colors.primary }]}
-                onPress={handleSubmit}
-                accessibilityLabel="Add expense"
-                accessibilityRole="button"
-              >
-                {isEditing
-                  ? <IconCheck size={20} color={colors.onPrimary} strokeWidth={2.5} />
-                  : <IconPlus size={20} color={colors.onPrimary} strokeWidth={2.5} />}
-                <Text style={[styles.submitButtonText, { color: colors.onPrimary }]}>
-                  {isEditing ? 'Save Changes' : 'Add Expense'}
-                </Text>
-              </PressableScale>
+              {/*
+                Recurrence last: it is a modifier on the expense above it, not
+                a property competing with the amount or the category.
+              */}
+              <View style={styles.inputGroup}>
+                <View style={styles.repeatRow}>
+                  <View style={styles.repeatCopy}>
+                    <Text
+                      style={[styles.label, styles.repeatLabel, { color: colors.text }]}
+                      nativeID="repeat-expense-label"
+                    >
+                      Repeat this expense
+                    </Text>
+                    <Text
+                      style={[styles.repeatHint, { color: colors.textDim }]}
+                      nativeID="repeat-expense-hint"
+                    >
+                      We'll remind you when it's next due.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={repeat}
+                    onValueChange={handleToggleRepeat}
+                    trackColor={{ true: colors.primary }}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: repeat }}
+                    accessibilityLabel="Repeat this expense"
+                    accessibilityHint="We'll remind you when it's next due"
+                    accessibilityLabelledBy="repeat-expense-label"
+                  />
+                </View>
+
+                {repeat && (
+                  <Animated.View
+                    entering={revealEntering()}
+                    exiting={revealExiting()}
+                    style={styles.repeatFields}
+                  >
+                    <RecurrenceFields
+                      frequency={repeatFrequency}
+                      onFrequencyChange={handleRepeatFrequencyChange}
+                      nextDueDate={repeatNextDue}
+                      onNextDueDateChange={handleRepeatDueChange}
+                      dateError={repeatError}
+                      idPrefix="expense-repeat"
+                    />
+                  </Animated.View>
+                )}
+              </View>
+
+              {/* Submit Button — laid out with a transition so revealing the
+                  recurrence fields slides it down rather than jumping it. */}
+              <Animated.View layout={listLayout()}>
+                <PressableScale
+                  style={[styles.submitButton, { backgroundColor: colors.primary }]}
+                  onPress={handleSubmit}
+                  accessibilityLabel={isEditing ? 'Save changes' : 'Add expense'}
+                  accessibilityRole="button"
+                >
+                  {isEditing
+                    ? <IconCheck size={20} color={colors.onPrimary} strokeWidth={2.5} />
+                    : <IconPlus size={20} color={colors.onPrimary} strokeWidth={2.5} />}
+                  <Text style={[styles.submitButtonText, { color: colors.onPrimary }]}>
+                    {isEditing ? 'Save Changes' : 'Add Expense'}
+                  </Text>
+                </PressableScale>
+              </Animated.View>
             </ScrollView>
           </View>
         </View>
@@ -622,6 +804,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 4,
   },
+  repeatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.md,
+  },
+  repeatCopy: { flex: 1, gap: 2 },
+  repeatLabel: { marginBottom: 0 },
+  repeatHint: { ...TEXT.caption },
+  repeatFields: { marginTop: SPACING.xs },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',

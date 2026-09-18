@@ -12,6 +12,13 @@ import {
 } from '../utils/storage';
 import type { Expense, Settings, RecurringExpense } from '../utils/storage';
 import type { ExportedSettings, ImportedBackup } from '../utils/expenseTransfer';
+import type { Frequency } from '../utils/recurrence';
+
+/** What the repeat toggle on an expense form hands back. */
+export interface RecurrenceInput {
+  frequency: Frequency;
+  nextDueDate: string;
+}
 
 /**
  * Tone of a feedback message, mapped straight onto a toast variant.
@@ -54,6 +61,14 @@ type AppAction =
   | { type: 'ADD_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
   | { type: 'EDIT_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
   | { type: 'DELETE_RECURRING_EXPENSE'; id: string }
+  | {
+      type: 'SAVE_EXPENSE_WITH_RECURRENCE';
+      expense: Expense;
+      /** The rule to create or update, or null when the toggle is off. */
+      rule: RecurringExpense | null;
+      /** A rule the user switched off, to be removed in the same write. */
+      removedRuleId?: string;
+    }
   | { type: 'IMPORT_EXPENSES'; expenses: Expense[]; recurringExpenses?: RecurringExpense[]; settings?: ExportedSettings; mode: 'merge' | 'replace' }
   | { type: 'UPDATE_SETTINGS'; settings: Settings }
   | { type: 'SET_LOADING'; isLoading: boolean }
@@ -86,6 +101,42 @@ function appReducer(state: AppState, action: AppAction): AppState {
       );
       saveExpenses(updatedExpenses);
       return { ...state, expenses: updatedExpenses };
+    }
+    /**
+     * Saves an expense and its recurring rule in a single state transition.
+     *
+     * The expense is written first and the rule second, so a rule can never
+     * exist for an expense that was not saved. Both land in one dispatch, so
+     * no render ever sees one without the other.
+     *
+     * The rule's nextDueDate is the NEXT occurrence, never the date of the
+     * expense just logged — that one has been recorded as spending already,
+     * and counting it again as a bill still due would double it. The form
+     * refuses to save the two as equal.
+     */
+    case 'SAVE_EXPENSE_WITH_RECURRENCE': {
+      const isExisting = state.expenses.some((e) => e.id === action.expense.id);
+      const updatedExpenses = (isExisting
+        ? state.expenses.map((e) => (e.id === action.expense.id ? action.expense : e))
+        : [action.expense, ...state.expenses]
+      ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      saveExpenses(updatedExpenses);
+
+      let updatedRecurring = state.recurringExpenses;
+      if (action.removedRuleId) {
+        updatedRecurring = updatedRecurring.filter((r) => r.id !== action.removedRuleId);
+      }
+      if (action.rule) {
+        const rule = action.rule;
+        updatedRecurring = updatedRecurring.some((r) => r.id === rule.id)
+          ? updatedRecurring.map((r) => (r.id === rule.id ? rule : r))
+          : [...updatedRecurring, rule];
+      }
+      if (updatedRecurring !== state.recurringExpenses) {
+        saveRecurringExpenses(updatedRecurring);
+      }
+
+      return { ...state, expenses: updatedExpenses, recurringExpenses: updatedRecurring };
     }
     case 'EDIT_EXPENSE': {
       const updatedExpenses = state.expenses
@@ -253,6 +304,10 @@ interface AppContextType extends AppState {
   editExpense: (expense: Expense) => Promise<void>;
   recategoriseExpenses: (from: string, to: string) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  saveExpenseWithRecurrence: (
+    expense: Omit<Expense, 'id'> | Expense,
+    recurrence: RecurrenceInput | null,
+  ) => Promise<void>;
   addRecurringExpense: (expense: Omit<RecurringExpense, 'id'>) => Promise<void>;
   editRecurringExpense: (expense: RecurringExpense) => Promise<void>;
   deleteRecurringExpense: (id: string) => Promise<void>;
@@ -362,6 +417,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [showFeedback]);
 
+  /**
+   * The save behind "Repeat this expense".
+   *
+   * Handles every combination in one place: a new expense with or without a
+   * rule, an existing one gaining a rule, having its rule edited, or having it
+   * switched off. Callers do not have to sequence two writes and cannot get
+   * the order wrong.
+   */
+  const saveExpenseWithRecurrence = useCallback(async (
+    expense: Omit<Expense, 'id'> | Expense,
+    recurrence: RecurrenceInput | null,
+  ) => {
+    try {
+      const existingId = 'id' in expense ? expense.id : undefined;
+      const previousRuleId = 'recurringId' in expense ? expense.recurringId : undefined;
+      const expenseId = existingId ?? Date.now().toString();
+      const ruleId = recurrence ? previousRuleId ?? `${Date.now()}-rule` : undefined;
+
+      const saved: Expense = {
+        ...expense,
+        id: expenseId,
+        // Cleared when the toggle is off, so an expense never points at a rule
+        // that has been removed.
+        recurringId: ruleId,
+      };
+
+      const rule: RecurringExpense | null = recurrence && ruleId
+        ? {
+            id: ruleId,
+            description: saved.description,
+            amount: saved.amount,
+            category: saved.category,
+            frequency: recurrence.frequency,
+            nextDueDate: recurrence.nextDueDate,
+            isVariableAmount: false,
+            sourceExpenseId: expenseId,
+          }
+        : null;
+
+      dispatch({
+        type: 'SAVE_EXPENSE_WITH_RECURRENCE',
+        expense: saved,
+        rule,
+        // Only when a rule existed and the toggle is now off.
+        removedRuleId: !recurrence && previousRuleId ? previousRuleId : undefined,
+      });
+    } catch {
+      showFeedback('Failed to save expense.', 'error');
+      throw new Error('save-failed');
+    }
+  }, [showFeedback]);
+
   const addRecurringExpense = useCallback(async (newExp: Omit<RecurringExpense, 'id'>) => {
     try {
       const recurringExpense: RecurringExpense = { ...newExp, id: Date.now().toString() };
@@ -437,6 +544,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         editExpense,
         recategoriseExpenses,
         deleteExpense,
+        saveExpenseWithRecurrence,
         addRecurringExpense,
         editRecurringExpense,
         deleteRecurringExpense,

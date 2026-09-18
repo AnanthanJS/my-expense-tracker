@@ -20,6 +20,8 @@ import MonthPill from '../MonthPill';
 import SummaryCard from '../SummaryCard';
 import SpendInsight from '../SpendInsight';
 import ExpenseForm from '../ExpenseForm';
+import type { ExpenseDraft } from '../ExpenseForm';
+import type { RecurrenceInput } from '../../context/AppContext';
 import CategoryBreakdown from '../CategoryBreakdown';
 import RecentActivity from '../RecentActivity';
 import UpcomingBills from '../UpcomingBills';
@@ -32,8 +34,7 @@ const HomeScreen: React.FC = () => {
     settings,
     selectedDate,
     setSelectedDate,
-    addExpense,
-    editExpense,
+    saveExpenseWithRecurrence,
     completeOnboarding,
   } = useApp();
   const { colors, isDark } = useAppTheme();
@@ -60,20 +61,32 @@ const HomeScreen: React.FC = () => {
 
   const goTo = useCallback((tab: string) => navigation.navigate(tab), [navigation]);
 
-  /** Saves, then confirms — warning instead when it tips a category over. */
-  const handleAdd = useCallback(async (draft: Parameters<typeof addExpense>[0]) => {
-    try {
-      await addExpense(draft);
-      announceSaved(draft);
-    } catch {
-      announceFailed(() => { handleAdd(draft); });
-    }
-  }, [addExpense, announceSaved, announceFailed]);
-
   const closeForm = useCallback(() => {
     setIsFormVisible(false);
     setEditing(null);
   }, []);
+
+  /** Saves, then confirms — warning instead when it tips a category over. */
+  const handleAdd = useCallback(async (draft: ExpenseDraft) => {
+    const { recurrence, ...expense } = draft;
+    try {
+      // One write: the expense, and its rule if the repeat toggle was on.
+      await saveExpenseWithRecurrence(expense, recurrence ?? null);
+      announceSaved(expense, recurrence?.frequency);
+    } catch {
+      announceFailed(() => { handleAdd(draft); });
+    }
+  }, [saveExpenseWithRecurrence, announceSaved, announceFailed]);
+
+  const handleSave = useCallback(async (updated: Expense & { recurrence?: RecurrenceInput | null }) => {
+    const { recurrence, ...expense } = updated;
+    try {
+      await saveExpenseWithRecurrence(expense, recurrence ?? null);
+      closeForm();
+    } catch {
+      announceFailed(() => { handleSave(updated); });
+    }
+  }, [saveExpenseWithRecurrence, announceFailed, closeForm]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -166,7 +179,7 @@ const HomeScreen: React.FC = () => {
         editing={editing}
         onClose={closeForm}
         onAdd={handleAdd}
-        onSave={(updated) => { editExpense(updated); closeForm(); }}
+        onSave={handleSave}
       />
 
       <OnboardingModal

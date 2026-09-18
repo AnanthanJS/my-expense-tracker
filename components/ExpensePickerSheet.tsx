@@ -5,6 +5,7 @@ import { IconSearch, IconX, IconPencilPlus } from '@tabler/icons-react-native';
 import { TEXT, RADII, SPACING, GUTTER, SCRIM_COLOR, getCategoryColor } from '../constants/theme';
 import { GROUP_TINTS, UNGROUPED_LABEL, getCategoryIcon, resolveGroup } from '../constants/categories';
 import { formatCurrency } from '../utils/formatCurrency';
+import { billKey } from '../utils/recurrence';
 import { formatDate } from '../utils/formatDate';
 import type { Expense, RecurringExpense } from '../utils/storage';
 import { useAppTheme } from '../hooks/useAppTheme';
@@ -20,15 +21,6 @@ interface ExpensePickerSheetProps {
   onSkip: () => void;
   onClose: () => void;
 }
-
-/**
- * Identity of a bill for the duplicate guard: the three fields a person would
- * use to say "that is the same one". Deliberately not the id — the whole point
- * is to catch a second bill being made from a different expense that describes
- * the same thing.
- */
-const billKey = (description: string, category: string, amount: number) =>
-  `${description.trim().toLowerCase()}|${category.toLowerCase()}|${amount}`;
 
 /**
  * Picks an already-logged expense to base a recurring bill on.

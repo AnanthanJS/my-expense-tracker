@@ -55,6 +55,18 @@ export function nextDueAfter(from: string, frequency: Frequency): string {
 }
 
 /**
+ * Identity of a bill as a person would judge it: description, category and
+ * amount. Deliberately not the id — two rules made from different expenses
+ * that describe the same thing are still the same bill.
+ *
+ * Shared by the picker's duplicate guard and the expense list's repeat badge
+ * so the two can never disagree about what counts as recurring.
+ */
+export function billKey(description: string, category: string, amount: number): string {
+  return `${description.trim().toLowerCase()}|${category.toLowerCase()}|${amount}`;
+}
+
+/**
  * How a frequency reads inside a sentence — "repeats monthly", not
  * "repeats Monthly".
  */

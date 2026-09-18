@@ -134,6 +134,26 @@ export function contentExiting() {
   return FadeOut.duration(DURATION.fast).reduceMotion(ReduceMotion.System);
 }
 
+/**
+ * A block of fields revealed by a toggle: fades in and rises the last 8px.
+ *
+ * The travel is small on purpose — this is a disclosure, not an arrival, and
+ * anything further reads as the form rebuilding itself.
+ */
+export function revealEntering() {
+  return FadeInDown.duration(DURATION.base)
+    .withInitialValues({ transform: [{ translateY: REVEAL_TRAVEL }] })
+    .reduceMotion(ReduceMotion.System);
+}
+
+/** The same block on its way out. */
+export function revealExiting() {
+  return FadeOut.duration(DURATION.fast).reduceMotion(ReduceMotion.System);
+}
+
+/** How far a revealed block travels. */
+export const REVEAL_TRAVEL = 8;
+
 /** Reflow for siblings when one is inserted or removed. */
 export function listLayout() {
   return LinearTransition.duration(DURATION.base).reduceMotion(ReduceMotion.System);
