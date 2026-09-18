@@ -366,7 +366,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const recurringExpense: RecurringExpense = { ...newExp, id: Date.now().toString() };
       dispatch({ type: 'ADD_RECURRING_EXPENSE', recurringExpense });
-      showFeedback('Recurring bill added!');
+      showFeedback('Recurring bill added');
     } catch {
       showFeedback('Failed to add recurring bill.', 'error');
     }

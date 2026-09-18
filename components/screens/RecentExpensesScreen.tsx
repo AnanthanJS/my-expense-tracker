@@ -33,6 +33,7 @@ import {
   IconTrash,
   IconPlus,
   IconEdit,
+  IconChevronRight,
 } from '@tabler/icons-react-native';
 import { FONTS, GUTTER, GLASS, TEXT, RADII, SCRIM_COLOR, SCRIM_COLOR_OPAQUE, getCategoryColor } from '../../constants/theme';
 import type { Expense, RecurringExpense } from '../../utils/storage';
@@ -46,6 +47,11 @@ import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import ExpenseForm from '../ExpenseForm';
 import MonthPill from '../MonthPill';
 import { useExpenseToast } from '../../hooks/useExpenseToast';
+import { nextDueAfter } from '../../utils/recurrence';
+import type { Frequency } from '../../utils/recurrence';
+import { isCompleteDate } from '../../utils/dateInput';
+import RecurrenceFields from '../RecurrenceFields';
+import ExpensePickerSheet from '../ExpensePickerSheet';
 import PressableScale from '../PressableScale';
 
 type ThemeColors = ReturnType<typeof useAppTheme>['colors'];
@@ -249,9 +255,20 @@ const RecentExpensesScreen: React.FC = () => {
   const [recDescription, setRecDescription] = useState('');
   const [recAmount, setRecAmount] = useState('');
   const [recCategory, setRecCategory] = useState(settings.categories[0] || 'Bills');
-  const [recFrequency, setRecFrequency] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
+  const [recFrequency, setRecFrequency] = useState<Frequency>('monthly');
   const [recIsVariable, setRecIsVariable] = useState(false);
   const [recNextDue, setRecNextDue] = useState(() => toLocalISODate(new Date()));
+  const [recError, setRecError] = useState<string | null>(null);
+
+  // Feature A: the expense a new bill was copied from, if any.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [prefillFrom, setPrefillFrom] = useState<Expense | null>(null);
+  /**
+   * Set the moment the user edits the date by hand. While it is false the date
+   * follows the frequency; once true we stop moving it under them, which is
+   * the difference between a helpful default and a field that fights back.
+   */
+  const [dueDateDirty, setDueDateDirty] = useState(false);
 
   /**
    * (C1) The list is scoped to the globally selected month, matching Home and
@@ -373,18 +390,78 @@ const RecentExpensesScreen: React.FC = () => {
       setRecAmount(expense.amount > 0 ? expense.amount.toString() : '');
       setRecCategory(expense.category); setRecFrequency(expense.frequency);
       setRecIsVariable(expense.isVariableAmount); setRecNextDue(expense.nextDueDate);
+      // An existing bill's date is its own; never recompute it from frequency.
+      setDueDateDirty(true);
     } else {
       setEditingId(null); setRecDescription(''); setRecAmount('');
       setRecCategory(settings.categories[0] || 'Bills'); setRecFrequency('monthly');
       setRecIsVariable(false); setRecNextDue(toLocalISODate(new Date()));
+      setDueDateDirty(false);
     }
+    setPrefillFrom(null);
+    setRecError(null);
     setRecurringModalVisible(true);
   }, [settings.categories]);
 
+  /**
+   * Copies an expense into the form. A copy, not a link: the bill is free to
+   * diverge from here, and nothing that happens to the original afterwards —
+   * an edit, a delete — reaches it. See RecurringExpense.sourceExpenseId.
+   */
+  const handlePrefillFrom = useCallback((expense: Expense) => {
+    setRecDescription(expense.description);
+    setRecAmount(expense.amount.toString());
+    setRecCategory(expense.category);
+    setRecIsVariable(false);
+    setPrefillFrom(expense);
+    setRecError(null);
+    // One interval on from the expense itself, rolled forward if that is
+    // already behind us.
+    setRecNextDue(nextDueAfter(expense.date, recFrequency));
+    setDueDateDirty(false);
+    setPickerOpen(false);
+  }, [recFrequency]);
+
+  /** Empties what the prefill filled, leaving the form as if typed from blank. */
+  const handleClearPrefill = useCallback(() => {
+    setRecDescription('');
+    setRecAmount('');
+    setRecCategory(settings.categories[0] || 'Bills');
+    setPrefillFrom(null);
+    setRecNextDue(toLocalISODate(new Date()));
+    setDueDateDirty(false);
+  }, [settings.categories]);
+
+  const handleFrequencyChange = useCallback((frequency: Frequency) => {
+    setRecFrequency(frequency);
+    // The default date is derived from the frequency, so it moves with it —
+    // unless the user has taken the field over.
+    if (!dueDateDirty && prefillFrom) {
+      setRecNextDue(nextDueAfter(prefillFrom.date, frequency));
+    }
+  }, [dueDateDirty, prefillFrom]);
+
+  const handleDueDateChange = useCallback((value: string) => {
+    setDueDateDirty(true);
+    setRecNextDue(value);
+    setRecError(null);
+  }, []);
+
   const handleRecurringSave = () => {
     const amt = parseFloat(recAmount);
-    if (!recDescription.trim() || (!recIsVariable && (isNaN(amt) || amt <= 0))) return;
-    const data = { description: recDescription.trim(), amount: recIsVariable ? 0 : amt, category: recCategory, frequency: recFrequency, nextDueDate: recNextDue, isVariableAmount: recIsVariable };
+    if (!recDescription.trim()) { setRecError('Give the bill a description.'); return; }
+    if (!recIsVariable && (isNaN(amt) || amt <= 0)) { setRecError('Enter an amount greater than 0.'); return; }
+    if (!isCompleteDate(recNextDue)) { setRecError('Enter the next due date as YYYY-MM-DD.'); return; }
+
+    const data = {
+      description: recDescription.trim(),
+      amount: recIsVariable ? 0 : amt,
+      category: recCategory,
+      frequency: recFrequency,
+      nextDueDate: recNextDue,
+      isVariableAmount: recIsVariable,
+      ...(prefillFrom ? { sourceExpenseId: prefillFrom.id } : {}),
+    };
     if (editingId) { editRecurringExpense({ ...data, id: editingId }); } else { addRecurringExpense(data); }
     setRecurringModalVisible(false);
   };
@@ -695,6 +772,46 @@ const RecentExpensesScreen: React.FC = () => {
               </PressableScale>
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+                {/*
+                  Only offered when there is something to pick and only for a
+                  new bill — on an edit the values are already the bill's own.
+                */}
+                {!editingId && expenses.length > 0 && (
+                  <>
+                    <PressableScale
+                      style={[styles.useExisting, { backgroundColor: colors.surfaceLight }]}
+                      onPress={() => setPickerOpen(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Use an existing expense"
+                      accessibilityHint="Opens a list of your expenses to copy one into this form"
+                    >
+                      <Text style={[styles.useExistingText, { color: colors.text }]} numberOfLines={1}>
+                        Use an existing expense
+                      </Text>
+                      <IconChevronRight size={20} color={colors.textDim} strokeWidth={2.2} />
+                    </PressableScale>
+
+                    {prefillFrom && (
+                      <View style={styles.prefillRow}>
+                        <Text
+                          style={[styles.prefillText, { color: colors.textDim }]}
+                          numberOfLines={2}
+                        >
+                          Prefilled from {prefillFrom.description} · {formatDate(prefillFrom.date)}
+                        </Text>
+                        <PressableScale
+                          onPress={handleClearPrefill}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          accessibilityRole="button"
+                          accessibilityLabel="Clear the prefilled values"
+                        >
+                          <Text style={[styles.prefillClear, { color: colors.primary }]}>Clear</Text>
+                        </PressableScale>
+                      </View>
+                    )}
+                  </>
+                )}
+
                 <Text style={[styles.formLabel, { color: colors.textMuted }]}>Description</Text>
                 <TextInput style={[styles.formInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
                   value={recDescription} onChangeText={setRecDescription} placeholder="e.g. Gym Membership" placeholderTextColor={colors.textDim} />
@@ -709,21 +826,45 @@ const RecentExpensesScreen: React.FC = () => {
                       value={recAmount} onChangeText={setRecAmount} placeholder="0.00" placeholderTextColor={colors.textDim} keyboardType="numeric" />
                   </>
                 )}
-                <Text style={[styles.formLabel, { color: colors.textMuted }]}>Frequency</Text>
-                <View style={styles.freqRow}>
-                  {(['monthly', 'weekly', 'yearly'] as const).map(freq => (
-                    <PressableScale key={freq}
-                      style={[styles.freqChip, { backgroundColor: colors.surfaceLight }, recFrequency === freq && { backgroundColor: colors.primary }]}
-                      onPress={() => setRecFrequency(freq)}>
-                      <Text style={[styles.catChipText, { color: recFrequency === freq ? colors.onPrimary : colors.textMuted }]}>
-                        {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                {/*
+                  The form has always held a category in state and never shown
+                  it, so every bill made here silently took the first category
+                  in the list. Prefilling one from an expense only means
+                  something if it can be seen and changed.
+                */}
+                <Text style={[styles.formLabel, { color: colors.textMuted }]}>Category</Text>
+                <View style={styles.catGrid}>
+                  {settings.categories.map(cat => (
+                    <PressableScale key={cat}
+                      style={[styles.catChip, { backgroundColor: colors.surfaceLight }, recCategory === cat && { backgroundColor: colors.primary }]}
+                      onPress={() => setRecCategory(cat)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: recCategory === cat }}
+                      accessibilityLabel={`Category ${cat}`}>
+                      <Text style={[styles.catChipText, { color: recCategory === cat ? colors.onPrimary : colors.textMuted }]}>
+                        {cat}
                       </Text>
                     </PressableScale>
                   ))}
                 </View>
-                <Text style={[styles.formLabel, { color: colors.textMuted }]}>Next Due Date (YYYY-MM-DD)</Text>
-                <TextInput style={[styles.formInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
-                  value={recNextDue} onChangeText={setRecNextDue} placeholder="2026-09-01" placeholderTextColor={colors.textDim} />
+
+                <RecurrenceFields
+                  frequency={recFrequency}
+                  onFrequencyChange={handleFrequencyChange}
+                  nextDueDate={recNextDue}
+                  onNextDueDateChange={handleDueDateChange}
+                  idPrefix="recurring-bill"
+                />
+
+                {recError && (
+                  <Text
+                    style={[styles.recError, { color: colors.danger }]}
+                    accessibilityLiveRegion="polite"
+                  >
+                    {recError}
+                  </Text>
+                )}
+
                 <PressableScale style={[styles.applyBtn, { backgroundColor: colors.primary, marginTop: 24 }]} onPress={handleRecurringSave}>
                   <Text style={[styles.applyText, { color: colors.onPrimary }]}>Save</Text>
                 </PressableScale>
@@ -732,6 +873,17 @@ const RecentExpensesScreen: React.FC = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ExpensePickerSheet
+        visible={pickerOpen}
+        expenses={expenses}
+        recurringExpenses={recurringExpenses}
+        currency={settings.currency}
+        groups={settings.categoryGroups || {}}
+        onSelect={handlePrefillFrom}
+        onSkip={() => setPickerOpen(false)}
+        onClose={() => setPickerOpen(false)}
+      />
     </View>
   );
 };
@@ -812,6 +964,26 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
   freqRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   freqChip: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 44, borderRadius: RADII.sm },
+  useExisting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderRadius: RADII.sm,
+  },
+  useExistingText: { ...TEXT.rowTitle, flex: 1 },
+  prefillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 8,
+  },
+  prefillText: { ...TEXT.caption, flex: 1 },
+  prefillClear: { ...TEXT.buttonSm, flexShrink: 0 },
+  recError: { ...TEXT.caption, marginTop: 12 },
 });
 
 export default React.memo(RecentExpensesScreen);
