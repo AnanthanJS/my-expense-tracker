@@ -150,7 +150,12 @@ const AboutScreen: React.FC = () => {
           </View>
 
           {/* ── Privacy ──────────────────────────────────────────────────── */}
-          <View style={[styles.card, styles.appCard, {
+          {/*
+            styles.flatCard, not styles.card: this one is tinted rather than
+            filled, and a translucent background cannot carry an Android
+            elevation. See the note on flatCard.
+          */}
+          <View style={[styles.flatCard, styles.appCard, {
             backgroundColor: calloutTint(colors.primary, isDark),
             borderColor: calloutBorder(colors.primary, isDark),
           }]}>
@@ -296,6 +301,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: SPACING.lg,
     ...ELEVATION.sm,
+  },
+  /**
+   * A card with no shadow, for callouts whose background is a tint rather
+   * than a fill.
+   *
+   * Android draws an elevation shadow from the view's outline and expects an
+   * opaque background to hide it. At 8% alpha the shadow shows straight
+   * through, which turned the privacy callout into a grey slab with a paler
+   * rectangle where its content sat. The insight card on Home has always been
+   * flat for the same reason; this matches it.
+   */
+  flatCard: {
+    borderRadius: RADII.lg,
+    borderWidth: 1,
+    marginBottom: SPACING.lg,
   },
   appCard: {
     flexDirection: 'row',
