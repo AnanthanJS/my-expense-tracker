@@ -1,8 +1,9 @@
 import React, { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SPACING, TEXT, RADII } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import PressableScale from './PressableScale';
 
 type ThemeColors = ReturnType<typeof useAppTheme>['colors'];
 
@@ -45,9 +46,9 @@ class ErrorBoundary extends Component<Props, State> {
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             An unexpected error occurred. Please try again.
           </Text>
-          <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={this.handleReset}>
+          <PressableScale style={[styles.button, { backgroundColor: colors.primary }]} onPress={this.handleReset}>
             <Text style={[styles.buttonText, { color: colors.background }]}>Try Again</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       );
     }

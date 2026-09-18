@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { View, Text, StyleSheet } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { contentExiting, listEntering, listLayout, rowEntering } from '../constants/motion';
 import { IconChevronRight } from '@tabler/icons-react-native';
 import { SPACING, GLASS, TEXT, RADII, ELEVATION, getCategoryColor, getBudgetTone } from '../constants/theme';
 import { GROUP_TINTS, UNGROUPED_LABEL, getCategoryIcon, resolveGroup } from '../constants/categories';
@@ -8,6 +9,8 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';
 import { formatCurrencyCompact } from '../utils/formatCurrency';
 import type { CategorySlice } from '../hooks/useMonthlyStats';
+import PressableScale from './PressableScale';
+import AnimatedBar from './AnimatedBar';
 
 interface CategoryBreakdownProps {
   byCategory: CategorySlice[];
@@ -43,9 +46,9 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
 
   return (
     <Animated.View
-      entering={FadeIn.duration(250)}
-      exiting={FadeOut.duration(200)}
-      layout={LinearTransition.duration(200)}
+      entering={rowEntering()}
+      exiting={contentExiting()}
+      layout={listLayout()}
       style={[styles.container, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}
     >
       <View style={styles.header}>
@@ -54,7 +57,7 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
       </View>
 
       <View style={styles.list}>
-        {rows.map(({ category, amount }) => {
+        {rows.map(({ category, amount }, index) => {
           const Icon = getCategoryIcon(category);
           const group = resolveGroup(category, groups);
           const tone = GROUP_TINTS[group] ?? GROUP_TINTS[UNGROUPED_LABEL];
@@ -74,8 +77,9 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
             : getCategoryColor(category);
 
           return (
-            <View
+            <Animated.View
               key={category}
+              entering={listEntering(index)}
               style={styles.item}
               accessible
               accessibilityLabel={
@@ -96,18 +100,17 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
                 </Text>
               </View>
               <View style={[styles.track, { backgroundColor: colors.surfaceLight }]}>
-                <View style={[styles.fill, { width: `${width}%`, backgroundColor: barColor }]} />
+                <AnimatedBar percent={width} color={barColor} style={styles.fill} />
               </View>
-            </View>
+            </Animated.View>
           );
         })}
       </View>
 
       {byCategory.length > limit && (
-        <TouchableOpacity
+        <PressableScale
           style={[styles.seeAll, { backgroundColor: colors.surfaceLight }]}
           onPress={onSeeAll}
-          activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={`See all ${byCategory.length} categories`}
         >
@@ -115,7 +118,7 @@ const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
             All {byCategory.length} categories
           </Text>
           <IconChevronRight size={18} color={colors.primary} strokeWidth={2.4} />
-        </TouchableOpacity>
+        </PressableScale>
       )}
     </Animated.View>
   );

@@ -1,12 +1,12 @@
-import React, { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -18,7 +18,10 @@ import {
 } from '@tabler/icons-react-native';
 import type { IconProps } from '@tabler/icons-react-native';
 import { FONTS, SPACING, ELEVATION, GLASS, TEXT, RADII } from '../constants/theme';
+import { SPRING } from '../constants/motion';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useReduceMotion } from '../hooks/useMotion';
+import PressableScale from './PressableScale';
 
 export type TabName = 'home' | 'recent' | 'analytics' | 'settings' | 'about';
 
@@ -39,6 +42,44 @@ const NAV_ITEMS: NavItem[] = [
 
 const PILL_PADDING = 8;
 const TAB_GAP = 4;
+/** How far the icon of a newly selected tab overshoots before settling. */
+const ICON_POP = 1.08;
+
+interface TabIconProps {
+  Icon: React.FC<IconProps>;
+  isActive: boolean;
+  color: string;
+}
+
+/**
+ * The tab icon, which gives a small kick the moment its tab becomes active.
+ *
+ * Only the icon moves, not the label or the pill: the pill is already tracking
+ * the pager position gesture-for-gesture, so anything else animating the same
+ * horizontal travel would be a second opinion on where the tab is.
+ */
+const TabIcon: React.FC<TabIconProps> = ({ Icon, isActive, color }) => {
+  const scale = useSharedValue(1);
+  const reduceMotion = useReduceMotion();
+
+  useEffect(() => {
+    if (!isActive || reduceMotion) return;
+    scale.value = withSequence(
+      withSpring(ICON_POP, SPRING.press),
+      withSpring(1, SPRING.gentle),
+    );
+  }, [isActive, reduceMotion, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Reanimated.View style={animatedStyle}>
+      <Icon size={22} color={color} strokeWidth={2} />
+    </Reanimated.View>
+  );
+};
 
 const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
   state,
@@ -85,6 +126,12 @@ const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
   const usableWidth = containerWidth - (TAB_GAP * (numTabs - 1));
   const tabWidth = containerWidth > 0 ? usableWidth / numTabs : 0;
 
+  /**
+   * Driven by the pager's own position rather than by `state.index`, so the
+   * pill follows a swipe under the finger instead of jumping once the gesture
+   * has already finished. That is why this one animation stays on react-native
+   * Animated: `position` is an Animated.Node handed to us by the navigator.
+   */
   const translateX = position.interpolate({
     inputRange: state.routes.map((_, i) => i),
     outputRange: state.routes.map((_, i) => i * (tabWidth + TAB_GAP)),
@@ -129,21 +176,20 @@ const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
           const Icon = item.icon;
 
           return (
-            <TouchableOpacity
+            <PressableScale
               key={item.key}
               // (#2) flex: 1 replaces minWidth: 78 so computed and actual tab widths agree
               style={styles.tab}
               onPress={() => handlePress(item.routeName)}
-              activeOpacity={0.7}
               accessibilityLabel={`${item.label} tab`}
               accessibilityHint={`Navigates to ${item.label} screen`}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
             >
-              <Icon
-                size={22}
+              <TabIcon
+                Icon={Icon}
+                isActive={isActive}
                 color={isActive ? colors.onPrimary : colors.textMuted}
-                strokeWidth={2}
               />
               {/*
                 5 tabs at maxWidth 94% leave ~54px per tab on a 320dp screen,
@@ -166,7 +212,7 @@ const BottomNavBar: React.FC<MaterialTopTabBarProps> = ({
               >
                 {item.label}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </View>

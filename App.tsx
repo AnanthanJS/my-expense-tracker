@@ -6,11 +6,10 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { useNavbarHeight } from './hooks/useNavbarHeight';
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { Provider as PaperProvider, Snackbar } from 'react-native-paper';
+import { Provider as PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider, useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
@@ -35,6 +34,8 @@ import { Sora_800ExtraBold } from '@expo-google-fonts/sora/800ExtraBold';
 import { FONTS } from './constants/theme';
 import { AppProvider, useApp } from './context/AppContext';
 import { useAppTheme } from './hooks/useAppTheme';
+import { ToastProvider } from './providers/ToastProvider';
+import ToastBridge from './providers/ToastBridge';
 
 import BottomNavBar from './components/BottomNavBar';
 import MainHeader from './components/MainHeader';
@@ -114,8 +115,7 @@ const AboutWithHeader = () => (
 function AppContent() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { isLoading, feedback, hideFeedback } = useApp();
-  const navbarHeight = useNavbarHeight(); // (#4) replaces hardcoded marginBottom: 100
+  const { isLoading } = useApp();
 
   if (isLoading) {
     return (
@@ -146,33 +146,6 @@ function AppContent() {
         <Tab.Screen name="About" component={AboutWithHeader} />
       </Tab.Navigator>
 
-      <Snackbar
-        visible={feedback.visible}
-        onDismiss={hideFeedback}
-        duration={feedback.onUndo ? 5000 : 3000}
-        style={{
-          backgroundColor: feedback.type === 'error' ? colors.danger : colors.surface,
-          marginBottom: navbarHeight,
-        }}
-        theme={{
-          colors: {
-            inverseOnSurface: feedback.type === 'error' ? colors.background : colors.text,
-            inversePrimary: colors.primary,
-          },
-        }}
-        action={feedback.onUndo ? {
-          label: 'Undo',
-          onPress: () => {
-            feedback.onUndo?.();
-            hideFeedback();
-          },
-        } : {
-          label: 'Dismiss',
-          onPress: hideFeedback,
-        }}
-      >
-        {feedback.message}
-      </Snackbar>
     </View>
   );
 }
@@ -186,34 +159,38 @@ function ThemedRoot() {
 
   return (
     <PaperProvider theme={paperTheme}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar
-          barStyle={isDark ? 'light-content' : 'dark-content'}
-          backgroundColor="transparent"
-          translucent
-        />
-        <NavigationContainer theme={{
-          dark: isDark,
-          colors: {
-            primary: colors.primary,
-            background: colors.background,
-            card: colors.surface,
-            text: colors.text,
-            border: colors.surfaceLight,
-            notification: colors.accent,
-          },
-          fonts: Platform.select({
-            default: {
-              regular: { fontFamily: FONTS.text.regular, fontWeight: '400' },
-              medium: { fontFamily: FONTS.text.medium, fontWeight: '500' },
-              bold: { fontFamily: FONTS.text.bold, fontWeight: '700' },
-              heavy: { fontFamily: FONTS.text.extrabold, fontWeight: '800' },
-            }
-          })
-        }}>
-          <AppContent />
-        </NavigationContainer>
-      </View>
+      <ToastProvider>
+        {/* Forwards AppContext feedback into the toast system. */}
+        <ToastBridge />
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <StatusBar
+            barStyle={isDark ? 'light-content' : 'dark-content'}
+            backgroundColor="transparent"
+            translucent
+          />
+          <NavigationContainer theme={{
+            dark: isDark,
+            colors: {
+              primary: colors.primary,
+              background: colors.background,
+              card: colors.surface,
+              text: colors.text,
+              border: colors.surfaceLight,
+              notification: colors.accent,
+            },
+            fonts: Platform.select({
+              default: {
+                regular: { fontFamily: FONTS.text.regular, fontWeight: '400' },
+                medium: { fontFamily: FONTS.text.medium, fontWeight: '500' },
+                bold: { fontFamily: FONTS.text.bold, fontWeight: '700' },
+                heavy: { fontFamily: FONTS.text.extrabold, fontWeight: '800' },
+              }
+            })
+          }}>
+            <AppContent />
+          </NavigationContainer>
+        </View>
+      </ToastProvider>
     </PaperProvider>
   );
 }

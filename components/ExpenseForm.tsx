@@ -3,14 +3,14 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   Platform,
   Modal,
   ScrollView,
   KeyboardAvoidingView,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { contentExiting, rowEntering } from '../constants/motion';
 import { IconPlus, IconX, IconCamera, IconPhoto, IconCheck } from '@tabler/icons-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
@@ -19,6 +19,7 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useApp } from '../context/AppContext';
 import type { Expense } from '../utils/storage';
 import { toLocalISODate } from '../utils/formatDate';
+import PressableScale from './PressableScale';
 
 export interface ExpenseDraft {
   description: string;
@@ -269,7 +270,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
         the keyboard. 'padding' works on both platforms for a bottom sheet.
       */}
       <KeyboardAvoidingView
-        behavior="padding"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.avoidingView}
       >
         <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR }]}>
@@ -284,14 +285,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
               <Text style={[styles.modalTitle, { color: colors.text }]}>
                 {isEditing ? 'Edit Expense' : 'Add Expense'}
               </Text>
-              <TouchableOpacity
+              <PressableScale
                 onPress={handleClose}
                 accessibilityLabel={isEditing ? 'Close edit expense sheet' : 'Close add expense sheet'}
                 accessibilityRole="button"
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <IconX size={24} color={colors.textDim} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
 
             <ScrollView
@@ -338,7 +339,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                     const isSelected = category === cat;
                     const catColor = getCategoryColor(cat);
                     return (
-                      <TouchableOpacity
+                      <PressableScale
                         key={cat}
                         style={[
                           styles.catChip,
@@ -366,7 +367,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                         >
                           {cat}
                         </Text>
-                      </TouchableOpacity>
+                      </PressableScale>
                     );
                   })}
                 </View>
@@ -385,7 +386,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                     const value = shortcut.resolve();
                     const isSelected = date === value;
                     return (
-                      <TouchableOpacity
+                      <PressableScale
                         key={shortcut.label}
                         style={[
                           styles.dateChip,
@@ -405,7 +406,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                         ]}>
                           {shortcut.label}
                         </Text>
-                      </TouchableOpacity>
+                      </PressableScale>
                     );
                   })}
                 </View>
@@ -429,8 +430,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                 />
                 {dateError && (
                   <Animated.Text
-                    entering={FadeIn.duration(150)}
-                    exiting={FadeOut.duration(150)}
+                    entering={rowEntering()}
+                    exiting={contentExiting()}
                     style={[styles.dateError, { color: colors.danger }]}
                   >
                     {dateError}
@@ -442,45 +443,44 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.textMuted }]}>Receipt Image (Optional)</Text>
                 <View style={styles.receiptActions}>
-                  <TouchableOpacity
+                  <PressableScale
                     style={[styles.receiptBtn, { backgroundColor: colors.surfaceLight }]}
                     onPress={handleTakePhoto}
                     disabled={isPickingImage}
                   >
                     <IconCamera size={20} color={colors.text} />
                     <Text style={[styles.receiptBtnText, { color: colors.text }]}>Camera</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </PressableScale>
+                  <PressableScale
                     style={[styles.receiptBtn, { backgroundColor: colors.surfaceLight }]}
                     onPress={handlePickImage}
                     disabled={isPickingImage}
                   >
                     <IconPhoto size={20} color={colors.text} />
                     <Text style={[styles.receiptBtnText, { color: colors.text }]}>Gallery</Text>
-                  </TouchableOpacity>
+                  </PressableScale>
                 </View>
                 {receiptUri && (
-                  <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.receiptAttached}>
+                  <Animated.View entering={rowEntering()} exiting={contentExiting()} style={styles.receiptAttached}>
                     <Text style={[{ color: colors.primary, ...TEXT.label }]}>
                       ✓ Receipt attached
                     </Text>
-                    <TouchableOpacity
+                    <PressableScale
                       onPress={() => setReceiptUri(null)}
                       hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
                       accessibilityLabel="Remove attached receipt"
                       accessibilityRole="button"
                     >
                       <IconX size={16} color={colors.danger} />
-                    </TouchableOpacity>
+                    </PressableScale>
                   </Animated.View>
                 )}
               </View>
 
               {/* Submit Button */}
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.submitButton, { backgroundColor: colors.primary }]}
                 onPress={handleSubmit}
-                activeOpacity={0.8}
                 accessibilityLabel="Add expense"
                 accessibilityRole="button"
               >
@@ -490,7 +490,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
                 <Text style={[styles.submitButtonText, { color: colors.onPrimary }]}>
                   {isEditing ? 'Save Changes' : 'Add Expense'}
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
             </ScrollView>
           </View>
         </View>

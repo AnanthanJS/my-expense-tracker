@@ -4,6 +4,8 @@ import { SPACING, TEXT, RADII, tint } from '../../constants/theme';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { formatCurrencyCompact } from '../../utils/formatCurrency';
 import type { MonthPoint } from '../../utils/insights';
+import { staggerDelay } from '../../constants/motion';
+import AnimatedColumn from './AnimatedColumn';
 
 interface MonthlyTrendChartProps {
   points: MonthPoint[];
@@ -40,7 +42,7 @@ const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ points, budget, c
         )}
 
         <View style={styles.bars}>
-          {points.map((point) => {
+          {points.map((point, index) => {
             const height = max > 0 ? (point.total / max) * PLOT_HEIGHT : 0;
             const over = budget > 0 && point.total > budget;
             const color = point.isCurrent
@@ -49,7 +51,8 @@ const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({ points, budget, c
 
             return (
               <View key={`${point.year}-${point.month}`} style={styles.barSlot}>
-                <View
+                <AnimatedColumn
+                  delay={staggerDelay(index)}
                   style={[
                     styles.bar,
                     {

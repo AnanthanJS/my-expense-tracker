@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { IconChevronLeft, IconChevronRight, IconPlus } from '@tabler/icons-react-native';
 import { TEXT, RADII, SPACING, GUTTER, GLASS, ELEVATION, getBudgetTone } from '../../constants/theme';
 import {
@@ -12,6 +12,8 @@ import {
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import { formatCurrencyCompact } from '../../utils/formatCurrency';
+import PressableScale from '../PressableScale';
+import AnimatedBar from '../AnimatedBar';
 
 interface CategoryBudgetsScreenProps {
   categories: string[];
@@ -68,7 +70,7 @@ const CategoryBudgetsScreen: React.FC<CategoryBudgetsScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <TouchableOpacity
+        <PressableScale
           onPress={onBack}
           style={styles.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -76,7 +78,7 @@ const CategoryBudgetsScreen: React.FC<CategoryBudgetsScreenProps> = ({
           accessibilityLabel="Back to settings"
         >
           <IconChevronLeft size={26} color={colors.text} strokeWidth={2.2} />
-        </TouchableOpacity>
+        </PressableScale>
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           Categories &amp; budgets
         </Text>
@@ -97,12 +99,7 @@ const CategoryBudgetsScreen: React.FC<CategoryBudgetsScreenProps> = ({
             </Text>
           </View>
           <View style={[styles.track, { backgroundColor: colors.surfaceLight }]}>
-            <View
-              style={[
-                styles.fill,
-                { width: `${fill}%`, backgroundColor: tone },
-              ]}
-            />
+            <AnimatedBar percent={fill} color={tone} style={styles.fill} />
           </View>
           <Text style={[styles.summaryFoot, { color: colors.textDim }]}>
             {overAssigned
@@ -122,14 +119,13 @@ const CategoryBudgetsScreen: React.FC<CategoryBudgetsScreenProps> = ({
                   const Icon = getCategoryIcon(name);
                   const limit = limits[name];
                   return (
-                    <TouchableOpacity
+                    <PressableScale
                       key={name}
                       style={[
                         styles.row,
                         index > 0 && { borderTopWidth: 1, borderTopColor: colors.surfaceLight },
                       ]}
                       onPress={() => onSelect(name)}
-                      activeOpacity={0.6}
                       accessibilityRole="button"
                       accessibilityLabel={`${name}, ${limit > 0 ? formatCurrencyCompact(limit, currency) : 'no limit'}`}
                       accessibilityHint="Opens this category for editing"
@@ -149,7 +145,7 @@ const CategoryBudgetsScreen: React.FC<CategoryBudgetsScreenProps> = ({
                         {limit > 0 ? formatCurrencyCompact(limit, currency) : 'No limit'}
                       </Text>
                       <IconChevronRight size={18} color={colors.textDim} strokeWidth={2} />
-                    </TouchableOpacity>
+                    </PressableScale>
                   );
                 })}
               </View>
@@ -157,16 +153,15 @@ const CategoryBudgetsScreen: React.FC<CategoryBudgetsScreenProps> = ({
           );
         })}
 
-        <TouchableOpacity
+        <PressableScale
           style={[styles.addBtn, { borderColor: colors.primary }]}
           onPress={onAdd}
-          activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Add a category"
         >
           <IconPlus size={20} color={colors.primary} strokeWidth={2.5} />
           <Text style={[styles.addText, { color: colors.primary }]}>Add a category</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </ScrollView>
     </View>
   );

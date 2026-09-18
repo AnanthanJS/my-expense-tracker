@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SPACING, ELEVATION, GLASS, TEXT, RADII } from '../constants/theme';
 import { GROUP_TINTS, UNGROUPED_LABEL, getCategoryIcon, resolveGroup } from '../constants/categories';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate } from '../utils/formatDate';
 import type { Expense } from '../utils/storage';
+import { listEntering } from '../constants/motion';
+import PressableScale from './PressableScale';
 
 interface RecentActivityProps {
   expenses: Expense[];
@@ -45,14 +47,14 @@ const RecentActivity: React.FC<RecentActivityProps> = ({
     <View style={[styles.container, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Recent</Text>
-        <TouchableOpacity
+        <PressableScale
           onPress={onSeeAll}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
           accessibilityLabel={`See all ${totalCount} expenses`}
         >
           <Text style={[styles.action, { color: colors.primary }]}>See all {totalCount}</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {rows.map((expense, index) => {
@@ -60,14 +62,14 @@ const RecentActivity: React.FC<RecentActivityProps> = ({
         const group = resolveGroup(expense.category, groups);
         const tone = GROUP_TINTS[group] ?? GROUP_TINTS[UNGROUPED_LABEL];
         return (
-          <TouchableOpacity
+          <PressableScale
             key={expense.id}
+            entering={listEntering(index)}
             style={[
               styles.row,
               index > 0 && { borderTopWidth: 1, borderTopColor: colors.surfaceLight },
             ]}
             onPress={() => onSelect(expense)}
-            activeOpacity={0.6}
             accessibilityRole="button"
             accessibilityLabel={`${expense.description}, ${formatCurrency(expense.amount, currency)}, ${expense.category}`}
             accessibilityHint="Opens this expense for editing"
@@ -86,7 +88,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({
             <Text style={[styles.amount, { color: colors.text }]} numberOfLines={1}>
               {formatCurrency(expense.amount, currency)}
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
         );
       })}
     </View>

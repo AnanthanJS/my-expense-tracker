@@ -6,7 +6,6 @@ import {
   StyleSheet,
   FlatList,
   SectionList,
-  TouchableOpacity,
   Platform,
   Modal,
   ScrollView,
@@ -16,7 +15,8 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import type { ListRenderItemInfo } from 'react-native';
-import AnimatedRN, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import AnimatedRN from 'react-native-reanimated';
+import { listLayout, rowEntering, rowExiting } from '../../constants/motion';
 import {
   IconSearch,
   IconX,
@@ -45,6 +45,8 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import ExpenseForm from '../ExpenseForm';
 import MonthPill from '../MonthPill';
+import { useExpenseToast } from '../../hooks/useExpenseToast';
+import PressableScale from '../PressableScale';
 
 type ThemeColors = ReturnType<typeof useAppTheme>['colors'];
 
@@ -82,22 +84,23 @@ const ExpenseRow = React.memo(({ item, currency, onDelete, onEdit, onViewReceipt
   const glass = isDark ? GLASS.dark : GLASS.light;
   const categoryColor = getCategoryColor(item.category);
 
-  // (C4) Deletes immediately; the Snackbar offers Undo for 5s.
+  // (C4) Deletes immediately; the toast offers Undo for 5s.
   const handleDelete = useCallback(() => onDelete(item.id), [item.id, onDelete]);
 
   return (
     <AnimatedRN.View
-      entering={FadeIn.duration(200)}
-      exiting={FadeOut.duration(180)}
-      layout={LinearTransition.duration(200)}
+      // Fade only, no travel: rows here mount as the list scrolls, and a row
+      // sliding in while the list is already moving reads as a glitch.
+      entering={rowEntering()}
+      exiting={rowExiting()}
+      layout={listLayout()}
       style={[styles.item, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}
     >
       {/* (C5) The whole row opens the editor — previously an expense could
           only be deleted and retyped. */}
-      <TouchableOpacity
+      <PressableScale
         style={styles.itemMain}
         onPress={() => onEdit(item)}
-        activeOpacity={0.6}
         accessibilityRole="button"
         accessibilityLabel={`${item.description}, ${formatCurrency(item.amount, currency)}, ${item.category}`}
         accessibilityHint="Opens this expense for editing"
@@ -113,27 +116,27 @@ const ExpenseRow = React.memo(({ item, currency, onDelete, onEdit, onViewReceipt
             {item.category} · {formatDate(item.date)}
           </Text>
         </View>
-      </TouchableOpacity>
+      </PressableScale>
       <View style={styles.itemRight}>
         <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
           <Text style={[styles.itemAmount, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
             {formatCurrency(item.amount, currency, { negative: true })}
           </Text>
           {item.receiptUri && (
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            <PressableScale style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityLabel={`View receipt for ${item.description}`} accessibilityRole="button"
               onPress={() => onViewReceipt && onViewReceipt(item.receiptUri!)}>
               <IconReceipt size={13} color={colors.primary} />
               <Text style={{ ...TEXT.caption, color: colors.primary }}>Receipt</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
         </View>
-        <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}
+        <PressableScale onPress={handleDelete} style={styles.deleteBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityLabel={`Delete ${item.description}`} accessibilityRole="button">
           <IconTrash size={15} color={colors.danger} strokeWidth={2} />
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </AnimatedRN.View>
   );
@@ -155,7 +158,7 @@ const RecurringCard = React.memo(({ item, currency, colors, isDark, onEdit, onDe
 
   return (
     <AnimatedRN.View
-      entering={FadeIn.duration(200)} exiting={FadeOut.duration(180)} layout={LinearTransition.duration(200)}
+      entering={rowEntering()} exiting={rowExiting()} layout={listLayout()}
       style={[styles.item, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow, paddingVertical: 14 }]}
     >
       <View style={[styles.categoryPill, { backgroundColor: categoryColor + '28' }]}>
@@ -171,13 +174,13 @@ const RecurringCard = React.memo(({ item, currency, colors, isDark, onEdit, onDe
           {item.isVariableAmount ? 'Variable' : formatCurrency(item.amount, currency)}
         </Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity onPress={() => onEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <PressableScale onPress={() => onEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <IconEdit size={15} color={colors.textDim} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => onDelete(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          </PressableScale>
+          <PressableScale onPress={() => onDelete(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel={`Delete ${item.description}`} accessibilityRole="button">
             <IconTrash size={15} color={colors.danger} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
     </AnimatedRN.View>
@@ -200,13 +203,13 @@ const SegmentedControl = React.memo(({ segments, selectedIndex, onChange, colors
       {segments.map((seg, i) => {
         const isActive = i === selectedIndex;
         return (
-          <TouchableOpacity key={seg}
+          <PressableScale key={seg}
             style={[styles.segItem, isActive && [styles.segItemActive, { backgroundColor: colors.primary }]]}
-            onPress={() => onChange(i)} activeOpacity={0.8} accessibilityRole="tab" accessibilityState={{ selected: isActive }}>
+            onPress={() => onChange(i)} accessibilityRole="tab" accessibilityState={{ selected: isActive }}>
             <Text style={[styles.segLabel, { color: isActive ? colors.onPrimary : colors.textMuted }, isActive && { fontFamily: FONTS.text.semibold }]}>
               {seg}
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
         );
       })}
     </View>
@@ -224,6 +227,7 @@ const RecentExpensesScreen: React.FC = () => {
   } = useApp();
   const { colors, isDark } = useAppTheme();
   const navbarHeight = useNavbarHeight();
+  const { announceSaved, announceFailed } = useExpenseToast();
   const glass = isDark ? GLASS.dark : GLASS.light;
 
   const [activeTab, setActiveTab] = useState(0);
@@ -402,6 +406,15 @@ const RecentExpensesScreen: React.FC = () => {
     [settings.currency, colors, isDark, deleteRecurringExpense, openRecurringForm],
   );
 
+  const handleAdd = useCallback(async (draft: Parameters<typeof addExpense>[0]) => {
+    try {
+      await addExpense(draft);
+      announceSaved(draft);
+    } catch {
+      announceFailed(() => { handleAdd(draft); });
+    }
+  }, [addExpense, announceSaved, announceFailed]);
+
   const hasFiltersApplied = hasActiveFilters || searchQuery.length > 0;
 
   const ExpenseEmpty = useMemo(() => (
@@ -423,10 +436,10 @@ const RecentExpensesScreen: React.FC = () => {
           <IconSearch size={64} color={colors.surfaceLight} strokeWidth={1} />
           <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>No results found</Text>
           {hasFiltersApplied && (
-            <TouchableOpacity onPress={() => { resetFilters(); setSearchQuery(''); }}
+            <PressableScale onPress={() => { resetFilters(); setSearchQuery(''); }}
               style={[styles.clearFiltersBtn, { borderColor: colors.primary }]}>
               <Text style={[styles.clearFiltersText, { color: colors.primary }]}>Clear filters</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
         </>
       )}
@@ -467,12 +480,12 @@ const RecentExpensesScreen: React.FC = () => {
                 placeholder="Search expenses..." placeholderTextColor={colors.textDim}
                 value={searchQuery} onChangeText={setSearchQuery} accessibilityLabel="Search expenses" />
               {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search" accessibilityRole="button">
+                <PressableScale onPress={() => setSearchQuery('')} accessibilityLabel="Clear search" accessibilityRole="button">
                   <IconX size={15} color={colors.textDim} strokeWidth={2.5} />
-                </TouchableOpacity>
+                </PressableScale>
               )}
             </View>
-            <TouchableOpacity style={[styles.headerIconBtn, { backgroundColor: glass.card, borderColor: hasActiveFilters ? colors.primary : glass.border }]}
+            <PressableScale style={[styles.headerIconBtn, { backgroundColor: glass.card, borderColor: hasActiveFilters ? colors.primary : glass.border }]}
               onPress={() => setShowFilters(true)} accessibilityLabel="Filter" accessibilityRole="button">
               <IconFilter size={19} color={hasActiveFilters ? colors.primary : colors.textMuted} strokeWidth={2} />
               {hasActiveFilters && (
@@ -480,11 +493,11 @@ const RecentExpensesScreen: React.FC = () => {
                   <Text style={[styles.filterBadgeText, { color: colors.onPrimary }]}>{activeFilterCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.headerIconBtn, { backgroundColor: glass.card, borderColor: glass.border }]}
+            </PressableScale>
+            <PressableScale style={[styles.headerIconBtn, { backgroundColor: glass.card, borderColor: glass.border }]}
               onPress={() => setShowTransferSheet(true)} accessibilityLabel="Export or import" accessibilityRole="button">
               <IconDotsVertical size={19} color={colors.textMuted} strokeWidth={2} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           <View style={styles.summaryRow}>
@@ -531,10 +544,10 @@ const RecentExpensesScreen: React.FC = () => {
             contentContainerStyle={styles.listContent} ListEmptyComponent={RecurringEmpty}
             ListFooterComponent={<View style={{ height: navbarHeight + 80 }} />}
           />
-          <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary, bottom: navbarHeight + 16 }]}
+          <PressableScale style={[styles.fab, { backgroundColor: colors.primary, bottom: navbarHeight + 16 }]}
             onPress={() => openRecurringForm()}>
             <IconPlus size={24} color={colors.onPrimary} />
-          </TouchableOpacity>
+          </PressableScale>
         </>
       )}
 
@@ -543,7 +556,7 @@ const RecentExpensesScreen: React.FC = () => {
         visible={editingExpense !== null}
         editing={editingExpense}
         onClose={() => setEditingExpense(null)}
-        onAdd={addExpense}
+        onAdd={handleAdd}
         onSave={(updated) => { editExpense(updated); setEditingExpense(null); }}
       />
 
@@ -553,18 +566,18 @@ const RecentExpensesScreen: React.FC = () => {
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Filter & Sort</Text>
-              <TouchableOpacity onPress={() => setShowFilters(false)}
+              <PressableScale onPress={() => setShowFilters(false)}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityLabel="Close filters" accessibilityRole="button">
                 <IconX size={24} color={colors.textDim} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
               <View style={styles.modalSection}>
                 <Text style={[styles.modalSectionTitle, { color: colors.textDim }]}>Sort by</Text>
                 <View style={styles.sortGrid}>
                   {(['newest', 'oldest', 'high-to-low', 'low-to-high'] as SortOption[]).map(opt => (
-                    <TouchableOpacity key={opt}
+                    <PressableScale key={opt}
                       style={[styles.sortCard, { backgroundColor: colors.surfaceLight, borderColor: sortOption === opt ? colors.primary : 'transparent' }]}
                       onPress={() => setSortOption(opt)} accessibilityState={{ selected: sortOption === opt }} accessibilityRole="radio" accessibilityLabel={opt.replace(/-/g, ' ')}>
                       {opt === 'high-to-low' ? <IconTrendingUp size={18} color={sortOption === opt ? colors.primary : colors.textDim} />
@@ -573,7 +586,7 @@ const RecentExpensesScreen: React.FC = () => {
                       <Text style={[styles.sortLabel, { color: sortOption === opt ? colors.text : colors.textMuted }]}>
                         {opt.replace(/-/g, ' ').toUpperCase()}
                       </Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   ))}
                 </View>
               </View>
@@ -593,24 +606,24 @@ const RecentExpensesScreen: React.FC = () => {
                   {settings.categories.map(cat => {
                     const active = selectedCategories.includes(cat);
                     return (
-                      <TouchableOpacity key={cat}
+                      <PressableScale key={cat}
                         style={[styles.catChip, { backgroundColor: colors.surfaceLight }, active && { backgroundColor: colors.primary }]}
                         onPress={() => toggleCategory(cat)} accessibilityState={{ selected: active }} accessibilityRole="checkbox" accessibilityLabel={cat}>
                         <Text style={[styles.catChipText, { color: active ? colors.onPrimary : colors.textMuted }]}>{cat}</Text>
                         {active && <IconCheck size={14} color={colors.onPrimary} style={{ marginLeft: 4 }} />}
-                      </TouchableOpacity>
+                      </PressableScale>
                     );
                   })}
                 </View>
               </View>
             </ScrollView>
             <View style={[styles.modalFooter, { borderTopColor: colors.surfaceLight }]}>
-              <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
+              <PressableScale onPress={resetFilters} style={styles.resetBtn}>
                 <Text style={[styles.resetText, { color: colors.textDim }]}>Reset All</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowFilters(false)} style={[styles.applyBtn, { backgroundColor: colors.primary }]}>
+              </PressableScale>
+              <PressableScale onPress={() => setShowFilters(false)} style={[styles.applyBtn, { backgroundColor: colors.primary }]}>
                 <Text style={[styles.applyText, { color: colors.onPrimary }]}>Done</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </View>
         </View>
@@ -622,11 +635,11 @@ const RecentExpensesScreen: React.FC = () => {
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Export & Import</Text>
-              <TouchableOpacity onPress={() => setShowTransferSheet(false)}
+              <PressableScale onPress={() => setShowTransferSheet(false)}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityLabel="Close export and import sheet" accessibilityRole="button">
                 <IconX size={24} color={colors.textDim} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <View style={styles.transferSheetBody}>
               {[
@@ -634,7 +647,7 @@ const RecentExpensesScreen: React.FC = () => {
                 { icon: <IconFileTypePdf size={22} color={colors.primary} />, title: 'Export PDF', desc: 'Save current view as a printable PDF', onPress: handleExportPdf },
                 { icon: <IconFileImport size={22} color={colors.primary} />, title: 'Import JSON', desc: 'Merge or replace from a JSON file', onPress: handleImportJson },
               ].map((row, i, arr) => (
-                <TouchableOpacity key={row.title}
+                <PressableScale key={row.title}
                   style={[styles.transferSheetRow, { borderBottomColor: i < arr.length - 1 ? colors.surfaceLight : 'transparent' }]}
                   onPress={row.onPress} accessibilityLabel={row.title} accessibilityRole="button">
                   {row.icon}
@@ -642,7 +655,7 @@ const RecentExpensesScreen: React.FC = () => {
                     <Text style={[styles.transferSheetTitle, { color: colors.text }]}>{row.title}</Text>
                     <Text style={[styles.transferSheetDesc, { color: colors.textDim }]}>{row.desc}</Text>
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
               ))}
             </View>
           </View>
@@ -653,13 +666,13 @@ const RecentExpensesScreen: React.FC = () => {
       <Modal visible={!!viewingReceiptUri} transparent animationType="fade" onRequestClose={() => setViewingReceiptUri(null)}>
         {/* Full-screen photo viewer — deliberately opaque, not the standard scrim. */}
         <View style={[styles.modalOverlay, { backgroundColor: SCRIM_COLOR_OPAQUE }]}>
-          <TouchableOpacity
+          <PressableScale
             style={{ position: 'absolute', top: 40, right: 20, zIndex: 10, padding: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADII.pill }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Close receipt" accessibilityRole="button"
             onPress={() => setViewingReceiptUri(null)}>
             <IconX size={24} color="#fff" />
-          </TouchableOpacity>
+          </PressableScale>
           {viewingReceiptUri && (
             <Image source={{ uri: viewingReceiptUri }} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
           )}
@@ -675,11 +688,11 @@ const RecentExpensesScreen: React.FC = () => {
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
                   {editingId ? 'Edit Recurring Bill' : 'New Recurring Bill'}
                 </Text>
-                <TouchableOpacity onPress={() => setRecurringModalVisible(false)}
+                <PressableScale onPress={() => setRecurringModalVisible(false)}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityLabel="Close recurring bill form" accessibilityRole="button">
                 <IconX size={24} color={colors.textDim} />
-              </TouchableOpacity>
+              </PressableScale>
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
                 <Text style={[styles.formLabel, { color: colors.textMuted }]}>Description</Text>
@@ -699,21 +712,21 @@ const RecentExpensesScreen: React.FC = () => {
                 <Text style={[styles.formLabel, { color: colors.textMuted }]}>Frequency</Text>
                 <View style={styles.freqRow}>
                   {(['monthly', 'weekly', 'yearly'] as const).map(freq => (
-                    <TouchableOpacity key={freq}
+                    <PressableScale key={freq}
                       style={[styles.freqChip, { backgroundColor: colors.surfaceLight }, recFrequency === freq && { backgroundColor: colors.primary }]}
                       onPress={() => setRecFrequency(freq)}>
                       <Text style={[styles.catChipText, { color: recFrequency === freq ? colors.onPrimary : colors.textMuted }]}>
                         {freq.charAt(0).toUpperCase() + freq.slice(1)}
                       </Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   ))}
                 </View>
                 <Text style={[styles.formLabel, { color: colors.textMuted }]}>Next Due Date (YYYY-MM-DD)</Text>
                 <TextInput style={[styles.formInput, { backgroundColor: colors.surfaceLight, color: colors.text }]}
                   value={recNextDue} onChangeText={setRecNextDue} placeholder="2026-09-01" placeholderTextColor={colors.textDim} />
-                <TouchableOpacity style={[styles.applyBtn, { backgroundColor: colors.primary, marginTop: 24 }]} onPress={handleRecurringSave}>
+                <PressableScale style={[styles.applyBtn, { backgroundColor: colors.primary, marginTop: 24 }]} onPress={handleRecurringSave}>
                   <Text style={[styles.applyText, { color: colors.onPrimary }]}>Save</Text>
-                </TouchableOpacity>
+                </PressableScale>
               </ScrollView>
             </View>
           </View>

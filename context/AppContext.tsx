@@ -12,6 +12,13 @@ import {
 } from '../utils/storage';
 import type { Expense, Settings, RecurringExpense } from '../utils/storage';
 
+/**
+ * Tone of a feedback message, mapped straight onto a toast variant.
+ * `destructive` is the one worth calling out: a delete succeeded, so it is not
+ * an error, but confirming it with a green tick reads wrong.
+ */
+export type FeedbackTone = 'success' | 'warning' | 'destructive' | 'error';
+
 // 1. Define State Shape
 interface AppState {
   expenses: Expense[];
@@ -22,10 +29,10 @@ interface AppState {
   feedback: {
     message: string;
     visible: boolean;
-    type: 'success' | 'error';
+    type: FeedbackTone;
     /**
      * (C4) Optional undo handler. Deleting is now optimistic with an Undo in
-     * the Snackbar instead of an up-front Alert: the common case (a delete the
+     * the toast instead of an up-front Alert: the common case (a delete the
      * user meant) costs no taps, and the rare case stays recoverable — which a
      * confirm dialog never made it, once confirmed.
      */
@@ -49,7 +56,7 @@ type AppAction =
   | { type: 'IMPORT_EXPENSES'; expenses: Expense[]; recurringExpenses?: RecurringExpense[]; mode: 'merge' | 'replace' }
   | { type: 'UPDATE_SETTINGS'; settings: Settings }
   | { type: 'SET_LOADING'; isLoading: boolean }
-  | { type: 'SHOW_FEEDBACK'; message: string; feedbackType: 'success' | 'error'; onUndo?: () => void }
+  | { type: 'SHOW_FEEDBACK'; message: string; feedbackType: FeedbackTone; onUndo?: () => void }
   | { type: 'HIDE_FEEDBACK' }
   | { type: 'ERASE_ALL' }
   | { type: 'COMPLETE_ONBOARDING' };
@@ -193,7 +200,7 @@ interface AppContextType extends AppState {
   deleteRecurringExpense: (id: string) => Promise<void>;
   importExpenses: (data: { expenses: Expense[], recurringExpenses?: RecurringExpense[] }, mode: 'merge' | 'replace') => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
-  showFeedback: (message: string, type?: 'success' | 'error', onUndo?: () => void) => void;
+  showFeedback: (message: string, type?: FeedbackTone, onUndo?: () => void) => void;
   hideFeedback: () => void;
   eraseAllData: () => Promise<void>;
   completeOnboarding: () => void;
@@ -245,7 +252,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const showFeedback = useCallback((
     message: string,
-    type: 'success' | 'error' = 'success',
+    type: FeedbackTone = 'success',
     onUndo?: () => void,
   ) => {
     dispatch({ type: 'SHOW_FEEDBACK', message, feedbackType: type, onUndo });
@@ -289,7 +296,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       dispatch({ type: 'DELETE_EXPENSE', id });
       showFeedback(
         'Expense deleted.',
-        'success',
+        'destructive',
         removed ? () => dispatch({ type: 'RESTORE_EXPENSE', expense: removed }) : undefined,
       );
     } catch {
@@ -321,7 +328,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       dispatch({ type: 'DELETE_RECURRING_EXPENSE', id });
       showFeedback(
         'Recurring bill deleted.',
-        'success',
+        'destructive',
         removed ? () => dispatch({ type: 'RESTORE_RECURRING_EXPENSE', recurringExpense: removed }) : undefined,
       );
     } catch {
@@ -349,7 +356,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const eraseAllData = useCallback(async () => {
     dispatch({ type: 'ERASE_ALL' });
-    showFeedback('All data erased.');
+    showFeedback('All data erased.', 'destructive');
   }, [showFeedback]);
 
   const completeOnboarding = useCallback(() => {

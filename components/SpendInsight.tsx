@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { IconAlertTriangle } from '@tabler/icons-react-native';
 import { SPACING, TEXT, RADII, tint, calloutTint, calloutBorder } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { formatCurrencyCompact } from '../utils/formatCurrency';
 import type { SpendDriver } from '../utils/insights';
+import PressableScale from './PressableScale';
 
 interface SpendInsightProps {
   driver: SpendDriver;
@@ -47,14 +48,14 @@ const SpendInsight: React.FC<SpendInsightProps> = ({ driver, currency, onView })
         </Text>
       </View>
 
-      <TouchableOpacity
+      <PressableScale
         onPress={onView}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         accessibilityRole="button"
         accessibilityLabel={`View ${driver.category} in Analytics`}
       >
         <Text style={[styles.action, { color: colors.primary }]}>View</Text>
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 };

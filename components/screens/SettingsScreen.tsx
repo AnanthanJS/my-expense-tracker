@@ -1,15 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  BackHandler,
-} from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { View, Text, StyleSheet, TextInput, ScrollView, Modal, BackHandler } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { contentExiting, rowEntering } from '../../constants/motion';
 import { IconCheck, IconChevronRight, IconX } from '@tabler/icons-react-native';
 import { SPACING, GUTTER, GLASS, SCRIM_COLOR, TEXT, RADII, ELEVATION, getBudgetTone } from '../../constants/theme';
 import { useApp } from '../../context/AppContext';
@@ -20,6 +12,7 @@ import type { ThemePreference, Settings } from '../../utils/storage';
 import CategoryBudgetsScreen from './CategoryBudgetsScreen';
 import CategoryEditSheet from '../CategoryEditSheet';
 import type { CategoryDraft } from '../CategoryEditSheet';
+import PressableScale from '../PressableScale';
 
 const CURRENCIES = [
   { symbol: '₹', label: 'Indian Rupee', code: 'INR' },
@@ -84,6 +77,8 @@ const SettingsScreen: React.FC = () => {
     updateSettings({ ...settingsRef.current, ...patch });
     setIsSaving(false);
     setSavedAt(Date.now());
+    // updateSettings already raises "Settings saved!", which the toast bridge
+    // picks up — announcing here too would show it twice.
   }, [updateSettings]);
 
   /** Debounced variant for text fields, so we don't write on every keystroke. */
@@ -257,8 +252,8 @@ const SettingsScreen: React.FC = () => {
             */}
             <Animated.View
               key={isSaving ? 'saving' : `saved-${savedAt}`}
-              entering={FadeIn.duration(180)}
-              exiting={FadeOut.duration(200)}
+              entering={rowEntering()}
+              exiting={contentExiting()}
               style={styles.savedChip}
             >
               {!isSaving && <IconCheck size={18} color={colors.success} strokeWidth={2.5} />}
@@ -334,10 +329,9 @@ const SettingsScreen: React.FC = () => {
           <View style={[styles.card, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}>
             <Text style={[styles.cardLabel, { color: colors.textDim }]}>Preferences</Text>
 
-            <TouchableOpacity
+            <PressableScale
               style={styles.linkRow}
               onPress={() => setShowCurrency(true)}
-              activeOpacity={0.6}
               accessibilityRole="button"
               accessibilityLabel={`Currency, ${currency ? currency.label : settings.currency}`}
             >
@@ -346,7 +340,7 @@ const SettingsScreen: React.FC = () => {
                 {settings.currency} {currency ? currency.label : ''}
               </Text>
               <IconChevronRight size={20} color={colors.textDim} strokeWidth={2} />
-            </TouchableOpacity>
+            </PressableScale>
 
             <View style={[styles.divider, { backgroundColor: colors.surfaceLight }]} />
 
@@ -355,7 +349,7 @@ const SettingsScreen: React.FC = () => {
               {THEMES.map((t) => {
                 const active = (settings.theme ?? 'system') === t.value;
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={t.value}
                     style={[
                       styles.segmentItem,
@@ -372,17 +366,16 @@ const SettingsScreen: React.FC = () => {
                     ]}>
                       {t.label}
                     </Text>
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </View>
           </View>
 
           {/* ── Categories & budgets ─────────────────────────────────────── */}
-          <TouchableOpacity
+          <PressableScale
             style={[styles.card, styles.navCard, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}
             onPress={() => setShowCategories(true)}
-            activeOpacity={0.6}
             accessibilityRole="button"
             accessibilityLabel={`Categories and budgets, ${settings.categories.length} categories, ${withLimit} with a limit`}
           >
@@ -393,7 +386,7 @@ const SettingsScreen: React.FC = () => {
               </Text>
             </View>
             <IconChevronRight size={22} color={colors.textDim} strokeWidth={2} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </ScrollView>
 
@@ -403,19 +396,19 @@ const SettingsScreen: React.FC = () => {
           <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Currency</Text>
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => setShowCurrency(false)}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityLabel="Close" accessibilityRole="button"
               >
                 <IconX size={22} color={colors.textDim} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {CURRENCIES.map((c, i) => {
                 const active = settings.currency === c.symbol;
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={c.code}
                     style={[
                       styles.currencyRow,
@@ -431,7 +424,7 @@ const SettingsScreen: React.FC = () => {
                     </Text>
                     <Text style={[styles.currencyLabel, { color: colors.text }]}>{c.label}</Text>
                     {active && <IconCheck size={20} color={colors.primary} strokeWidth={2.5} />}
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </ScrollView>

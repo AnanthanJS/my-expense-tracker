@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   Modal,
   ScrollView,
@@ -21,6 +20,7 @@ import {
 } from '../constants/categories';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { formatCurrencyCompact } from '../utils/formatCurrency';
+import PressableScale from './PressableScale';
 
 export interface CategoryDraft {
   /** Original name, so a rename can be applied to existing expenses. */
@@ -154,13 +154,13 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
               <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
                 {isEditing ? 'Edit category' : 'New category'}
               </Text>
-              <TouchableOpacity
+              <PressableScale
                 onPress={onClose}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityLabel="Close" accessibilityRole="button"
               >
                 <IconX size={22} color={colors.textDim} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
 
             <ScrollView
@@ -193,7 +193,7 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
               </View>
 
               <View style={styles.chipRow}>
-                <TouchableOpacity
+                <PressableScale
                   style={[
                     styles.chip,
                     {
@@ -208,11 +208,11 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
                   <Text style={[styles.chipText, { color: limit === '' ? colors.primary : colors.textMuted }]}>
                     No limit
                   </Text>
-                </TouchableOpacity>
+                </PressableScale>
                 {suggestions.map((amount) => {
                   const active = parseFloat(limit) === amount;
                   return (
-                    <TouchableOpacity
+                    <PressableScale
                       key={amount}
                       style={[
                         styles.chip,
@@ -228,7 +228,7 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
                       <Text style={[styles.chipText, { color: active ? colors.primary : colors.textMuted }]}>
                         {formatCurrencyCompact(amount, currency)}
                       </Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   );
                 })}
               </View>
@@ -242,7 +242,7 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
                 {CATEGORY_GROUPS.map((g) => {
                   const active = group === g;
                   return (
-                    <TouchableOpacity
+                    <PressableScale
                       key={g}
                       style={[
                         styles.chip,
@@ -258,7 +258,7 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
                       <Text style={[styles.chipText, { color: active ? colors.primary : colors.textMuted }]}>
                         {g}
                       </Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   );
                 })}
               </View>
@@ -270,7 +270,7 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
               {isEditing && onDelete && (
                 <>
                   <View style={[styles.divider, { backgroundColor: colors.surfaceLight }]} />
-                  <TouchableOpacity
+                  <PressableScale
                     style={styles.deleteRow}
                     onPress={handleDelete}
                     accessibilityRole="button"
@@ -278,22 +278,21 @@ const CategoryEditSheet: React.FC<CategoryEditSheetProps> = ({
                   >
                     <IconTrash size={20} color={colors.danger} strokeWidth={2} />
                     <Text style={[styles.deleteText, { color: colors.danger }]}>Delete category</Text>
-                  </TouchableOpacity>
+                  </PressableScale>
                   <Text style={[styles.helper, { color: colors.textDim }]}>
                     Past expenses are kept and moved to Other. You&apos;ll be asked to confirm.
                   </Text>
                 </>
               )}
 
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.save, { backgroundColor: colors.primary }]}
                 onPress={handleSave}
-                activeOpacity={0.9}
                 accessibilityRole="button"
                 accessibilityLabel="Save category"
               >
                 <Text style={[styles.saveText, { color: colors.onPrimary }]}>Save</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </ScrollView>
           </View>
         </View>

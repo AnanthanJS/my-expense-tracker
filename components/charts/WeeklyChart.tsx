@@ -4,6 +4,8 @@ import { SPACING, TEXT, RADII } from '../../constants/theme';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { formatCurrencyCompact } from '../../utils/formatCurrency';
 import type { WeeklyPace } from '../../utils/insights';
+import { staggerDelay } from '../../constants/motion';
+import AnimatedColumn from './AnimatedColumn';
 
 interface WeeklyChartProps {
   pace: WeeklyPace;
@@ -48,7 +50,7 @@ const WeeklyChart: React.FC<WeeklyChartProps> = ({ pace, currency }) => {
         )}
 
         <View style={styles.bars}>
-          {buckets.map((bucket) => {
+          {buckets.map((bucket, index) => {
             const height = max > 0 ? (bucket.amount / max) * PLOT_HEIGHT : 0;
             // Colour intensity tracks magnitude, so the heavy week reads as
             // heavy even before you check the number above it.
@@ -67,7 +69,8 @@ const WeeklyChart: React.FC<WeeklyChartProps> = ({ pace, currency }) => {
                   </Text>
                 )}
                 {bucket.elapsed ? (
-                  <View
+                  <AnimatedColumn
+                    delay={staggerDelay(index)}
                     style={[
                       styles.bar,
                       { height: Math.max(height, bucket.amount > 0 ? 4 : 0), backgroundColor: colors.primary, opacity: weight },

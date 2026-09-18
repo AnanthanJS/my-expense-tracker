@@ -1,14 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  Modal,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Modal, Alert } from 'react-native';
 import {
   IconCoin,
   IconLock,
@@ -32,6 +23,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import { exportExpensesAsCsv, exportExpensesAsJson, pickExpensesJson } from '../../utils/expenseTransfer';
 import { formatDate } from '../../utils/formatDate';
+import PressableScale from '../PressableScale';
 
 const FEATURES: { icon: React.FC<IconProps>; label: string }[] = [
   { icon: IconTrendingUp, label: 'Category breakdowns' },
@@ -183,14 +175,13 @@ const AboutScreen: React.FC = () => {
               const Icon = row.icon;
               const tone = row.danger ? colors.danger : colors.text;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={row.label}
                   style={[
                     styles.row,
                     index > 0 && { borderTopWidth: 1, borderTopColor: colors.surfaceLight },
                   ]}
                   onPress={row.onPress}
-                  activeOpacity={0.6}
                   accessibilityRole="button"
                   accessibilityLabel={row.sub ? `${row.label}. ${row.sub}` : row.label}
                 >
@@ -202,7 +193,7 @@ const AboutScreen: React.FC = () => {
                     )}
                   </View>
                   <IconChevronRight size={18} color={row.danger ? colors.danger : colors.textDim} strokeWidth={2} />
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </View>
@@ -266,15 +257,15 @@ const AboutScreen: React.FC = () => {
               accessibilityLabel={`Type ${ERASE_WORD} to confirm erasing all data`}
             />
             <View style={styles.dialogActions}>
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.dialogBtn, { borderColor: colors.surfaceLight, borderWidth: 1 }]}
                 onPress={() => { setEraseOpen(false); setEraseConfirm(''); }}
                 accessibilityRole="button"
                 accessibilityLabel="Cancel"
               >
                 <Text style={[styles.dialogBtnText, { color: colors.textMuted }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 style={[
                   styles.dialogBtn,
                   { backgroundColor: colors.danger },
@@ -286,7 +277,7 @@ const AboutScreen: React.FC = () => {
                 accessibilityLabel="Erase all data"
               >
                 <Text style={[styles.dialogBtnText, { color: colors.onDanger }]}>Erase</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </View>
         </View>

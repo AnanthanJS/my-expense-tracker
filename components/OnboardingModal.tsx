@@ -1,11 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, Modal } from 'react-native';
 import type { DimensionValue } from 'react-native';
 import {
   IconChartBar,
@@ -21,6 +15,7 @@ import {
 import type { IconProps } from '@tabler/icons-react-native';
 import { TEXT, RADII, SCRIM_COLOR } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import PressableScale from './PressableScale';
 
 interface Step {
   title: string;
@@ -114,19 +109,18 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete }
           </View>
 
           <View style={styles.footer}>
-            <TouchableOpacity
+            <PressableScale
               onPress={onComplete}
               style={styles.skipBtn}
               accessibilityLabel="Skip guide"
               accessibilityRole="button"
             >
               <Text style={[styles.skipText, { color: colors.textDim }]}>Skip</Text>
-            </TouchableOpacity>
+            </PressableScale>
 
-            <TouchableOpacity
+            <PressableScale
               onPress={handleNext}
               style={[styles.nextBtn, { backgroundColor: colors.primary }]}
-              activeOpacity={0.8}
               accessibilityLabel={currentStep === STEPS.length - 1 ? 'Finish guide' : 'Next step'}
               accessibilityRole="button"
             >
@@ -138,7 +132,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ visible, onComplete }
               ) : (
                 <IconArrowRight size={20} color={colors.onPrimary} strokeWidth={2.5} style={{ marginLeft: 8 }} />
               )}
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         </View>
       </View>

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   Modal,
   TextInput,
   KeyboardAvoidingView,
@@ -17,6 +16,9 @@ import { IconCheck, IconX } from '@tabler/icons-react-native';
 import type { RecurringExpense } from '../utils/storage';
 import { toLocalISODate } from '../utils/formatDate';
 import { formatCurrency } from '../utils/formatCurrency';
+import Animated from 'react-native-reanimated';
+import { listEntering } from '../constants/motion';
+import PressableScale from './PressableScale';
 
 const UpcomingBills: React.FC = () => {
   const { recurringExpenses, addExpense, editRecurringExpense, settings } = useApp();
@@ -92,10 +94,10 @@ const UpcomingBills: React.FC = () => {
     <View style={styles.container}>
       <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Upcoming bills</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {upcoming.map((bill) => {
+        {upcoming.map((bill, index) => {
           const isOverdue = new Date(bill.nextDueDate) < new Date(new Date().setHours(0,0,0,0));
           return (
-            <View key={bill.id} style={[styles.card, { 
+            <Animated.View key={bill.id} entering={listEntering(index)} style={[styles.card, { 
               backgroundColor: glass.card, 
               borderColor: isOverdue ? colors.danger : glass.border,
               shadowColor: glass.shadow,
@@ -110,14 +112,14 @@ const UpcomingBills: React.FC = () => {
                   {isOverdue ? 'Overdue: ' : 'Due: '}{bill.nextDueDate}
                 </Text>
               </View>
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.payBtn, { backgroundColor: colors.primary }]}
                 onPress={() => handlePayClick(bill)}
               >
                 <IconCheck size={16} color={colors.onPrimary} strokeWidth={3} />
                 <Text style={[styles.payText, { color: colors.onPrimary }]}>Pay</Text>
-              </TouchableOpacity>
-            </View>
+              </PressableScale>
+            </Animated.View>
           );
         })}
       </ScrollView>
@@ -128,9 +130,9 @@ const UpcomingBills: React.FC = () => {
             <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Pay {payingBill?.description}</Text>
-                <TouchableOpacity onPress={() => setPayingBill(null)}>
+                <PressableScale onPress={() => setPayingBill(null)}>
                   <IconX size={24} color={colors.textDim} />
-                </TouchableOpacity>
+                </PressableScale>
               </View>
               <Text style={[styles.label, { color: colors.textMuted }]}>Enter Amount ({settings.currency})</Text>
               <TextInput
@@ -142,9 +144,9 @@ const UpcomingBills: React.FC = () => {
                 keyboardType="decimal-pad"
                 autoFocus
               />
-              <TouchableOpacity style={[styles.submitBtn, { backgroundColor: colors.primary }]} onPress={submitVariablePayment}>
+              <PressableScale style={[styles.submitBtn, { backgroundColor: colors.primary }]} onPress={submitVariablePayment}>
                 <Text style={[styles.submitText, { color: colors.onPrimary }]}>Confirm Payment</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </View>
         </KeyboardAvoidingView>

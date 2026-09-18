@@ -5,6 +5,9 @@ import { SPACING, ELEVATION, GLASS, TEXT, RADII, tint } from '../constants/theme
 import { useAppTheme } from '../hooks/useAppTheme';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatCurrency';
 import type { CategorySlice } from '../hooks/useMonthlyStats';
+import AnimatedBar from './AnimatedBar';
+import AnimatedNumber from './AnimatedNumber';
+import { DURATION } from '../constants/motion';
 
 interface SummaryCardProps {
   total: number;
@@ -46,11 +49,15 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
    * so the two are directly comparable by width.
    */
   const segments = useMemo(() => {
-    if (budget <= 0) return { budgetFlex: 0, overFlex: 0, fill: 0 };
+    if (budget <= 0) return { budgetPct: 0, overPct: 0, fill: 0 };
     if (isOver) {
-      return { budgetFlex: budget / total, overFlex: over / total, fill: 100 };
+      return {
+        budgetPct: (budget / total) * 100,
+        overPct: (over / total) * 100,
+        fill: 100,
+      };
     }
-    return { budgetFlex: 1, overFlex: 0, fill: (total / budget) * 100 };
+    return { budgetPct: 100, overPct: 0, fill: (total / budget) * 100 };
   }, [budget, total, over, isOver]);
 
   const trendUp = trendPct !== null && trendPct > 0;
@@ -103,12 +110,25 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
         <>
           <View style={[styles.track, { backgroundColor: colors.surfaceLight }]}>
             {isOver ? (
+              /*
+               * The red grows a beat after the blue so the overshoot reads as a
+               * second event — you saw the budget fill, then you saw it exceeded.
+               */
               <View style={styles.segmentRow}>
-                <View style={{ flex: segments.budgetFlex, backgroundColor: colors.primary }} />
-                <View style={{ flex: segments.overFlex, backgroundColor: colors.danger }} />
+                <AnimatedBar
+                  percent={segments.budgetPct}
+                  color={colors.primary}
+                  style={styles.segment}
+                />
+                <AnimatedBar
+                  percent={segments.overPct}
+                  color={colors.danger}
+                  delay={DURATION.fast}
+                  style={styles.segment}
+                />
               </View>
             ) : (
-              <View style={[styles.fill, { width: `${segments.fill}%`, backgroundColor: colors.primary }]} />
+              <AnimatedBar percent={segments.fill} color={colors.primary} style={styles.fill} />
             )}
           </View>
 
@@ -140,9 +160,23 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
           >
             Transactions
           </Text>
-          <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1}>
-            {count > 0 ? count : '—'}
-          </Text>
+          {count > 0 ? (
+            /*
+             * Counted rather than cut, because it is the one stat that is a
+             * plain integer: the money cells beside it rely on
+             * `adjustsFontSizeToFit` to survive a narrow column, and TextInput
+             * has no equivalent. Height is pinned to the same line height the
+             * sibling Text cells resolve to so the row stays on one baseline.
+             */
+            <AnimatedNumber
+              value={count}
+              style={[styles.statValue, { color: colors.text, height: TEXT.moneyLg.lineHeight }]}
+            />
+          ) : (
+            <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1}>
+              —
+            </Text>
+          )}
         </View>
 
         <View style={[styles.statDivider, { backgroundColor: colors.surfaceLight }]} />
@@ -228,6 +262,9 @@ const styles = StyleSheet.create({
 
   track: { height: 12, borderRadius: RADII.pill, overflow: 'hidden' },
   segmentRow: { flexDirection: 'row', height: '100%' },
+  // Segments are square-ended: the track clips the outer corners, and rounding
+  // the join between blue and red would read as a gap rather than a boundary.
+  segment: { height: '100%' },
   fill: { height: '100%', borderRadius: RADII.pill },
   footRow: {
     flexDirection: 'row',

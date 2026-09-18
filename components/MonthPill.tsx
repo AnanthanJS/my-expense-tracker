@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, StyleSheet, Modal } from 'react-native';
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -8,6 +8,7 @@ import {
 import { TEXT, RADII, SPACING, GLASS, ELEVATION, SCRIM_COLOR } from '../constants/theme';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { getMonthName } from '../utils/storage';
+import PressableScale from './PressableScale';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -64,7 +65,7 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
   return (
     <>
       <View style={[styles.pill, { backgroundColor: glass.card, borderColor: glass.border, shadowColor: glass.shadow }]}>
-        <TouchableOpacity
+        <PressableScale
           onPress={() => step(-1)}
           style={styles.arrow}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -72,12 +73,11 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
           accessibilityLabel="Previous month"
         >
           <IconChevronLeft size={22} color={colors.textMuted} strokeWidth={2.2} />
-        </TouchableOpacity>
+        </PressableScale>
 
-        <TouchableOpacity
+        <PressableScale
           onPress={openPicker}
           style={styles.label}
-          activeOpacity={0.6}
           accessibilityRole="button"
           accessibilityLabel={`${monthName}. Change month`}
         >
@@ -85,9 +85,9 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
             {monthName}
           </Text>
           <IconChevronDown size={18} color={colors.textMuted} strokeWidth={2.2} />
-        </TouchableOpacity>
+        </PressableScale>
 
-        <TouchableOpacity
+        <PressableScale
           onPress={() => step(1)}
           style={[styles.arrow, nextDisabled && styles.arrowDisabled]}
           disabled={nextDisabled}
@@ -97,7 +97,7 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
           accessibilityState={{ disabled: nextDisabled }}
         >
           <IconChevronRight size={22} color={colors.textMuted} strokeWidth={2.2} />
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       <Modal
@@ -106,24 +106,24 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
         animationType="fade"
         onRequestClose={() => setPickerOpen(false)}
       >
-        <TouchableOpacity
+        <PressableScale
           style={[styles.overlay, { backgroundColor: SCRIM_COLOR }]}
-          activeOpacity={1}
+          scaleTo={1}
           onPress={() => setPickerOpen(false)}
           accessibilityLabel="Close month picker"
         >
-          <TouchableOpacity activeOpacity={1} style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
+          <PressableScale scaleTo={1} style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.surfaceLight }]}>
             <View style={styles.yearRow}>
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => setPickerYear((y) => y - 1)}
                 style={styles.arrow}
                 accessibilityRole="button"
                 accessibilityLabel="Previous year"
               >
                 <IconChevronLeft size={22} color={colors.textMuted} strokeWidth={2.2} />
-              </TouchableOpacity>
+              </PressableScale>
               <Text style={[styles.yearText, { color: colors.text }]}>{pickerYear}</Text>
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => setPickerYear((y) => y + 1)}
                 style={[styles.arrow, pickerYear >= today.getFullYear() && styles.arrowDisabled]}
                 disabled={pickerYear >= today.getFullYear()}
@@ -131,7 +131,7 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
                 accessibilityLabel="Next year"
               >
                 <IconChevronRight size={22} color={colors.textMuted} strokeWidth={2.2} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
 
             <View style={styles.grid}>
@@ -140,7 +140,7 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
                   pickerYear === selectedDate.getFullYear() && index === selectedDate.getMonth();
                 const disabled = isFuture(pickerYear, index);
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={label}
                     style={[
                       styles.month,
@@ -159,12 +159,12 @@ const MonthPill: React.FC<MonthPillProps> = ({ selectedDate, onDateChange }) => 
                     ]}>
                       {label}
                     </Text>
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </PressableScale>
+        </PressableScale>
       </Modal>
     </>
   );
