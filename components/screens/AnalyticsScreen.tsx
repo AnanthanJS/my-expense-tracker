@@ -1,14 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 import { IconChevronDown, IconChevronUp, IconArrowUpRight, IconArrowDownRight } from '@tabler/icons-react-native';
+import Animated from 'react-native-reanimated';
+import { listLayout, revealEntering, staggerDelay } from '../../constants/motion';
 import { useApp } from '../../context/AppContext';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { GLASS, SPACING, GUTTER, TEXT, RADII, ELEVATION, getCategoryColor } from '../../constants/theme';
 import { useNavbarHeight } from '../../hooks/useNavbarHeight';
 import { useMonthlyStats } from '../../hooks/useMonthlyStats';
 import { getWeeklyPace, getSixMonthSeries } from '../../utils/insights';
-import { formatCurrencyCompact } from '../../utils/formatCurrency';
+import { formatCurrency, formatCurrencyCompact } from '../../utils/formatCurrency';
+import { formatDate } from '../../utils/formatDate';
 import { getMonthName } from '../../utils/storage';
 import MonthPill from '../MonthPill';
 import MonthTransition from '../MonthTransition';
@@ -18,6 +21,15 @@ import PressableScale from '../PressableScale';
 
 /** Categories beyond this are rolled into a single "smaller categories" row. */
 const LEGEND_LIMIT = 4;
+
+/**
+ * Expenses listed inside an opened category before the rest are summarised.
+ *
+ * A category with forty rows would turn the card into a second expense list,
+ * which is not what this screen is for — the point is to see what drove the
+ * number, and the handful that did are all at the top.
+ */
+const DRILLDOWN_LIMIT = 8;
 
 export default function AnalyticsScreen() {
   const { expenses, settings, selectedDate, setSelectedDate } = useApp();
@@ -69,6 +81,28 @@ export default function AnalyticsScreen() {
     () => getSixMonthSeries(expenses, selectedDate),
     [expenses, selectedDate],
   );
+
+  /**
+   * The month's expenses grouped by category, largest first.
+   *
+   * Largest rather than most recent on purpose: this section answers "where
+   * did it go", and the two or three that account for most of a category are
+   * the answer. The Expenses tab is the place to read them by date.
+   */
+  const expensesByCategory = useMemo(() => {
+    const grouped = new Map<string, typeof stats.expenses>();
+    stats.expenses.forEach((expense) => {
+      const list = grouped.get(expense.category);
+      if (list) list.push(expense);
+      else grouped.set(expense.category, [expense]);
+    });
+    grouped.forEach((list) => list.sort((a, b) => b.amount - a.amount));
+    return grouped;
+  }, [stats.expenses]);
+
+  const toggleCategory = useCallback((category: string) => {
+    setSelectedCategory((prev) => (prev === category ? null : category));
+  }, []);
 
   const previousLabel = series.length > 1 ? series[series.length - 2].label : null;
   const trend = stats.trendPct;
@@ -138,34 +172,87 @@ export default function AnalyticsScreen() {
               <View style={styles.legend}>
                 {visible.map((slice, index) => {
                   const isActive = slice.category === selectedCategory;
+                  const rows = expensesByCategory.get(slice.category) ?? [];
+                  const shown = rows.slice(0, DRILLDOWN_LIMIT);
+                  const hidden = rows.length - shown.length;
+
                   return (
-                    <PressableScale
-                      key={slice.category}
-                      style={[
-                        styles.legendRow,
-                        index > 0 && { borderTopWidth: 1, borderTopColor: colors.surfaceLight },
-                      ]}
-                      onPress={() => setSelectedCategory(isActive ? null : slice.category)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isActive }}
-                      accessibilityLabel={`${slice.category}, ${formatCurrencyCompact(slice.amount, currency)}, ${Math.round(slice.share * 100)} percent`}
-                    >
-                      <View style={[styles.dot, { backgroundColor: getCategoryColor(slice.category) }]} />
-                      <Text
-                        style={[styles.legendName, { color: isActive ? colors.primary : colors.text }]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.8}
+                    <Animated.View key={slice.category} layout={listLayout()}>
+                      <PressableScale
+                        style={[
+                          styles.legendRow,
+                          index > 0 && { borderTopWidth: 1, borderTopColor: colors.surfaceLight },
+                        ]}
+                        onPress={() => toggleCategory(slice.category)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isActive, expanded: isActive }}
+                        accessibilityHint={isActive ? 'Hides these expenses' : 'Shows the expenses in this category'}
+                        accessibilityLabel={`${slice.category}, ${formatCurrencyCompact(slice.amount, currency)}, ${Math.round(slice.share * 100)} percent, ${rows.length} expense${rows.length === 1 ? '' : 's'}`}
                       >
-                        {slice.category}
-                      </Text>
-                      <Text style={[styles.legendValue, { color: colors.text }]} numberOfLines={1}>
-                        {formatCurrencyCompact(slice.amount, currency)}
-                      </Text>
-                      <Text style={[styles.legendShare, { color: colors.textDim }]}>
-                        {Math.round(slice.share * 100)}%
-                      </Text>
-                    </PressableScale>
+                        <View style={[styles.dot, { backgroundColor: getCategoryColor(slice.category) }]} />
+                        <Text
+                          style={[styles.legendName, { color: isActive ? colors.primary : colors.text }]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.8}
+                        >
+                          {slice.category}
+                        </Text>
+                        <Text style={[styles.legendValue, { color: colors.text }]} numberOfLines={1}>
+                          {formatCurrencyCompact(slice.amount, currency)}
+                        </Text>
+                        <Text style={[styles.legendShare, { color: colors.textDim }]}>
+                          {Math.round(slice.share * 100)}%
+                        </Text>
+                        {/* The chevron says the row opens; without it the only
+                            hint is that the donut slice happens to move. */}
+                        {isActive
+                          ? <IconChevronUp size={16} color={colors.primary} strokeWidth={2.4} />
+                          : <IconChevronDown size={16} color={colors.textDim} strokeWidth={2.4} />}
+                      </PressableScale>
+
+                      {isActive && rows.length > 0 && (
+                        <Animated.View
+                          entering={revealEntering()}
+                          /*
+                            No exit animation on purpose. The card is not
+                            clipped — it cannot be, without losing its shadow —
+                            so a fading block outlives the row it belongs to and
+                            spills over the card below. The wrapper's layout
+                            transition closes the gap smoothly on its own.
+                          */
+                          style={[styles.drilldown, { borderLeftColor: getCategoryColor(slice.category) }]}
+                        >
+                          {shown.map((expense, rowIndex) => (
+                            <Animated.View
+                              key={expense.id}
+                              entering={revealEntering().delay(staggerDelay(rowIndex))}
+                              style={styles.drilldownRow}
+                              accessible
+                              accessibilityLabel={`${expense.description}, ${formatCurrency(expense.amount, currency)}, ${formatDate(expense.date)}`}
+                            >
+                              <View style={styles.drilldownInfo}>
+                                <Text style={[styles.drilldownDesc, { color: colors.text }]} numberOfLines={1}>
+                                  {expense.description}
+                                </Text>
+                                <Text style={[styles.drilldownDate, { color: colors.textDim }]} numberOfLines={1}>
+                                  {formatDate(expense.date)}
+                                </Text>
+                              </View>
+                              <Text style={[styles.drilldownAmount, { color: colors.text }]} numberOfLines={1}>
+                                {formatCurrency(expense.amount, currency)}
+                              </Text>
+                            </Animated.View>
+                          ))}
+
+                          {hidden > 0 && (
+                            <Text style={[styles.drilldownMore, { color: colors.textDim }]}>
+                              +{hidden} smaller {hidden === 1 ? 'expense' : 'expenses'} in this category
+                            </Text>
+                          )}
+                        </Animated.View>
+                      )}
+                    </Animated.View>
                   );
                 })}
 
@@ -295,6 +382,24 @@ const styles = StyleSheet.create({
   legendName: { ...TEXT.rowTitle, flex: 1 },
   legendValue: { ...TEXT.money },
   legendShare: { ...TEXT.caption, minWidth: 30, textAlign: 'right' },
+
+  drilldown: {
+    borderLeftWidth: 2,
+    paddingLeft: SPACING.md,
+    marginLeft: 5,
+    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  drilldownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  drilldownInfo: { flex: 1, gap: 1 },
+  drilldownDesc: { ...TEXT.bodySm },
+  drilldownDate: { ...TEXT.caption },
+  drilldownAmount: { ...TEXT.moneySm, flexShrink: 0 },
+  drilldownMore: { ...TEXT.caption, fontStyle: 'italic' },
 
   expander: {
     flexDirection: 'row',
