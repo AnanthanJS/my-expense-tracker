@@ -5,15 +5,48 @@ import * as Sharing from 'expo-sharing';
 import type { Expense, Settings, RecurringExpense } from './storage';
 import { formatDate } from './formatDate';
 
+/**
+ * The part of Settings a backup carries.
+ *
+ * `hasSeenOnboarding` and `lastBackupAt` are deliberately left out: they
+ * describe this install, not your data, and restoring them onto a new phone
+ * would skip its onboarding and claim a backup it never made.
+ */
+export type ExportedSettings = Pick<
+  Settings,
+  | 'categories'
+  | 'categoryBudgets'
+  | 'categoryGroups'
+  | 'currency'
+  | 'income'
+  | 'budget'
+  | 'theme'
+  | 'categorizationRules'
+>;
+
 interface ExpenseExportFile {
   app: 'my-expense-tracker';
-  version: 1;
+  version: number;
   exportedAt: string;
+  /** Absent in version 1 files, which carried expenses only. */
+  settings?: ExportedSettings;
   expenses: Expense[];
   recurringExpenses?: RecurringExpense[];
 }
 
-const EXPORT_VERSION = 1;
+export interface ImportedBackup {
+  expenses: Expense[];
+  recurringExpenses: RecurringExpense[];
+  /** Absent when restoring a version 1 file. */
+  settings?: ExportedSettings;
+}
+
+/**
+ * 2 added the settings block. Version 1 files still import — they simply bring
+ * no settings, and any category named by their expenses is recovered from the
+ * expenses themselves on the way in.
+ */
+const EXPORT_VERSION = 2;
 
 const sanitizeFilePart = (value: string) =>
   value.replace(/[^a-z0-9-]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase();
@@ -70,10 +103,63 @@ const normalizeRecurring = (value: unknown): RecurringExpense | null => {
   };
 };
 
-const readExpensesFromJson = (contents: string): { expenses: Expense[], recurringExpenses: RecurringExpense[] } => {
+/**
+ * Pulls the settings block out of a backup, keeping only fields of the shape
+ * we expect. A hand-edited or truncated file should cost you the setting it
+ * mangled, not the whole import.
+ */
+const normalizeSettings = (value: unknown): ExportedSettings | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const c = value as Partial<ExportedSettings>;
+  const out: ExportedSettings = {} as ExportedSettings;
+
+  if (Array.isArray(c.categories)) {
+    const names = c.categories
+      .filter((n): n is string => typeof n === 'string')
+      .map((n) => n.trim())
+      .filter(Boolean);
+    // De-duplicated, because a category list with two "Food" entries renders
+    // two identical rows you cannot tell apart in Categories & budgets.
+    if (names.length > 0) out.categories = Array.from(new Set(names));
+  }
+
+  const numberMap = (m: unknown): Record<string, number> | undefined => {
+    if (!m || typeof m !== 'object') return undefined;
+    const entries = Object.entries(m as Record<string, unknown>)
+      .map(([k, v]) => [k, Number(v)] as const)
+      .filter(([, v]) => Number.isFinite(v) && v > 0);
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  };
+
+  const stringMap = (m: unknown): Record<string, string> | undefined => {
+    if (!m || typeof m !== 'object') return undefined;
+    const entries = Object.entries(m as Record<string, unknown>)
+      .filter(([, v]) => typeof v === 'string' && v);
+    return entries.length > 0 ? (Object.fromEntries(entries) as Record<string, string>) : undefined;
+  };
+
+  const budgets = numberMap(c.categoryBudgets);
+  if (budgets) out.categoryBudgets = budgets;
+
+  const groups = stringMap(c.categoryGroups);
+  if (groups) out.categoryGroups = groups;
+
+  const rules = stringMap(c.categorizationRules);
+  if (rules) out.categorizationRules = rules;
+
+  if (typeof c.currency === 'string' && c.currency) out.currency = c.currency;
+  if (typeof c.income === 'string' && c.income) out.income = c.income;
+  if (typeof c.budget === 'string' && c.budget) out.budget = c.budget;
+  if (c.theme === 'system' || c.theme === 'light' || c.theme === 'dark') out.theme = c.theme;
+
+  return Object.keys(out).length > 0 ? out : undefined;
+};
+
+const readExpensesFromJson = (contents: string): ImportedBackup => {
   const parsed = JSON.parse(contents) as unknown;
   let sourceExpenses: unknown[] | null = null;
   let sourceRecurring: unknown[] | null = null;
+  let settings: ExportedSettings | undefined;
 
   if (Array.isArray(parsed)) {
     sourceExpenses = parsed;
@@ -81,6 +167,7 @@ const readExpensesFromJson = (contents: string): { expenses: Expense[], recurrin
     const file = parsed as ExpenseExportFile;
     sourceExpenses = Array.isArray(file.expenses) ? file.expenses : null;
     sourceRecurring = Array.isArray(file.recurringExpenses) ? file.recurringExpenses : null;
+    settings = normalizeSettings(file.settings);
   }
 
   if (!sourceExpenses) {
@@ -94,7 +181,7 @@ const readExpensesFromJson = (contents: string): { expenses: Expense[], recurrin
     throw new Error('No valid expenses or recurring expenses were found in this file.');
   }
 
-  return { expenses, recurringExpenses };
+  return { expenses, recurringExpenses, settings };
 };
 
 const escapeHtml = (value: string) =>
@@ -157,7 +244,12 @@ const buildExpensesPdfHtml = (expenses: Expense[], settings: Settings) => {
   `;
 };
 
-export const exportExpensesAsJson = async (expenses: Expense[], recurringExpenses: RecurringExpense[] = []) => {
+export const exportExpensesAsJson = async (
+  expenses: Expense[],
+  recurringExpenses: RecurringExpense[] = [],
+  /** Omit to write an expenses-only file, as version 1 did. */
+  settings?: Settings,
+) => {
   await assertCanShare();
   const sanitizedExpenses = expenses.map((e) => {
     const { receiptUri, ...rest } = e;
@@ -171,6 +263,16 @@ export const exportExpensesAsJson = async (expenses: Expense[], recurringExpense
     app: 'my-expense-tracker',
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
+    settings: settings && {
+      categories: settings.categories,
+      categoryBudgets: settings.categoryBudgets,
+      categoryGroups: settings.categoryGroups,
+      currency: settings.currency,
+      income: settings.income,
+      budget: settings.budget,
+      theme: settings.theme,
+      categorizationRules: settings.categorizationRules,
+    },
     expenses: sanitizedExpenses,
     recurringExpenses,
   };
@@ -240,7 +342,7 @@ export const exportExpensesAsPdf = async (expenses: Expense[], settings: Setting
   });
 };
 
-export const pickExpensesJson = async (): Promise<{ expenses: Expense[], recurringExpenses: RecurringExpense[] } | null> => {
+export const pickExpensesJson = async (): Promise<ImportedBackup | null> => {
   const result = await DocumentPicker.getDocumentAsync({
     type: 'application/json',
     copyToCacheDirectory: true,

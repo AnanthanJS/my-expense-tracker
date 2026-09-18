@@ -341,9 +341,9 @@ const RecentExpensesScreen: React.FC = () => {
   const handleExportJson = useCallback(async () => {
     setShowTransferSheet(false);
     if (filtered.length === 0 && recurringExpenses.length === 0) { showFeedback('Nothing to export.', 'error'); return; }
-    try { await exportExpensesAsJson(filtered, recurringExpenses); }
+    try { await exportExpensesAsJson(filtered, recurringExpenses, settings); }
     catch (e) { showFeedback(`Export failed: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error'); }
-  }, [filtered, recurringExpenses, showFeedback]);
+  }, [filtered, recurringExpenses, settings, showFeedback]);
 
   const handleExportPdf = useCallback(async () => {
     setShowTransferSheet(false);

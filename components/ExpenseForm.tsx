@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -110,11 +110,31 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
     setDateError(null);
   }, [visible, editing, settings.categories]);
 
+  /**
+   * Guards against editing a category out from under an open sheet.
+   *
+   * Only for a new expense: on an existing one the category is the record's
+   * own, and quietly swapping it for the first in the list turned "fix a typo
+   * in the description" into a silent re-categorisation. An unknown category
+   * is shown as a chip of its own below instead.
+   */
   useEffect(() => {
+    if (isEditing) return;
     if (!settings.categories.includes(category)) {
       setCategory(settings.categories[0] || 'Other');
     }
-  }, [settings.categories, category]);
+  }, [isEditing, settings.categories, category]);
+
+  /**
+   * The category list to render: the configured ones, plus this expense's own
+   * if it is not among them, so nothing the record holds is unrepresented.
+   */
+  const categoryOptions = useMemo(
+    () => (category && !settings.categories.includes(category)
+      ? [...settings.categories, category]
+      : settings.categories),
+    [settings.categories, category],
+  );
 
   useEffect(() => {
     // Skipped while editing: re-applying a learned rule would silently
@@ -335,7 +355,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ visible, onClose, onAdd, edit
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.textMuted }]}>Category</Text>
                 <View style={styles.catGrid}>
-                  {settings.categories.map((cat) => {
+                  {categoryOptions.map((cat) => {
                     const isSelected = category === cat;
                     const catColor = getCategoryColor(cat);
                     return (

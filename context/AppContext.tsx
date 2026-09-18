@@ -11,6 +11,7 @@ import {
   clearAllData
 } from '../utils/storage';
 import type { Expense, Settings, RecurringExpense } from '../utils/storage';
+import type { ExportedSettings, ImportedBackup } from '../utils/expenseTransfer';
 
 /**
  * Tone of a feedback message, mapped straight onto a toast variant.
@@ -53,7 +54,7 @@ type AppAction =
   | { type: 'ADD_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
   | { type: 'EDIT_RECURRING_EXPENSE'; recurringExpense: RecurringExpense }
   | { type: 'DELETE_RECURRING_EXPENSE'; id: string }
-  | { type: 'IMPORT_EXPENSES'; expenses: Expense[]; recurringExpenses?: RecurringExpense[]; mode: 'merge' | 'replace' }
+  | { type: 'IMPORT_EXPENSES'; expenses: Expense[]; recurringExpenses?: RecurringExpense[]; settings?: ExportedSettings; mode: 'merge' | 'replace' }
   | { type: 'UPDATE_SETTINGS'; settings: Settings }
   | { type: 'SET_LOADING'; isLoading: boolean }
   | { type: 'SHOW_FEEDBACK'; message: string; feedbackType: FeedbackTone; onUndo?: () => void }
@@ -147,7 +148,64 @@ function appReducer(state: AppState, action: AppAction): AppState {
         saveRecurringExpenses(updatedRecurring);
       }
 
-      return { ...state, expenses: updatedExpenses, recurringExpenses: updatedRecurring };
+      /*
+       * Categories named by the incoming rows are added whatever else the file
+       * carried. Without this an imported expense in a category this phone has
+       * never heard of cannot be given a budget, and — worse — opening it in
+       * the editor silently re-files it under the first category in the list.
+       *
+       * This runs for expenses-only backups too, which is the whole point:
+       * those files are still valid, and this is the only chance to recover
+       * their categories.
+       */
+      const namedCategories = new Set<string>();
+      updatedExpenses.forEach((e) => { if (e.category) namedCategories.add(e.category); });
+      updatedRecurring.forEach((r) => { if (r.category) namedCategories.add(r.category); });
+
+      const incoming = action.settings;
+      const isReplace = action.mode === 'replace';
+
+      /*
+       * Merge follows the choice already made for the expenses: replacing your
+       * data replaces the setup around it, merging only fills in what this
+       * phone does not already have. A merge never overwrites a budget,
+       * currency or income you have set here.
+       */
+      const mergedCategories = Array.from(new Set([
+        ...(isReplace && incoming?.categories ? incoming.categories : state.settings.categories),
+        ...(!isReplace && incoming?.categories ? incoming.categories : []),
+        ...namedCategories,
+      ]));
+
+      const fillMap = <T,>(mine: Record<string, T> | undefined, theirs: Record<string, T> | undefined) => {
+        if (!theirs) return mine;
+        return isReplace ? theirs : { ...theirs, ...mine };
+      };
+
+      const updatedSettings: Settings = {
+        ...state.settings,
+        categories: mergedCategories,
+        categoryBudgets: fillMap(state.settings.categoryBudgets, incoming?.categoryBudgets),
+        categoryGroups: fillMap(state.settings.categoryGroups, incoming?.categoryGroups),
+        categorizationRules: fillMap(state.settings.categorizationRules, incoming?.categorizationRules),
+        ...(isReplace && incoming
+          ? {
+              currency: incoming.currency ?? state.settings.currency,
+              income: incoming.income ?? state.settings.income,
+              budget: incoming.budget ?? state.settings.budget,
+              theme: incoming.theme ?? state.settings.theme,
+            }
+          : {}),
+      };
+
+      saveSettings(updatedSettings);
+
+      return {
+        ...state,
+        expenses: updatedExpenses,
+        recurringExpenses: updatedRecurring,
+        settings: updatedSettings,
+      };
     }
     case 'UPDATE_SETTINGS': {
       saveSettings(action.settings);
@@ -198,7 +256,7 @@ interface AppContextType extends AppState {
   addRecurringExpense: (expense: Omit<RecurringExpense, 'id'>) => Promise<void>;
   editRecurringExpense: (expense: RecurringExpense) => Promise<void>;
   deleteRecurringExpense: (id: string) => Promise<void>;
-  importExpenses: (data: { expenses: Expense[], recurringExpenses?: RecurringExpense[] }, mode: 'merge' | 'replace') => Promise<void>;
+  importExpenses: (data: ImportedBackup, mode: 'merge' | 'replace') => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
   showFeedback: (message: string, type?: FeedbackTone, onUndo?: () => void) => void;
   hideFeedback: () => void;
@@ -336,9 +394,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [showFeedback]);
 
-  const importExpenses = useCallback(async (data: { expenses: Expense[], recurringExpenses?: RecurringExpense[] }, mode: 'merge' | 'replace') => {
+  const importExpenses = useCallback(async (data: ImportedBackup, mode: 'merge' | 'replace') => {
     try {
-      dispatch({ type: 'IMPORT_EXPENSES', expenses: data.expenses, recurringExpenses: data.recurringExpenses, mode });
+      dispatch({
+        type: 'IMPORT_EXPENSES',
+        expenses: data.expenses,
+        recurringExpenses: data.recurringExpenses,
+        // Undefined for an expenses-only file, which stays a valid backup.
+        settings: data.settings,
+        mode,
+      });
       showFeedback(`${data.expenses.length} expense${data.expenses.length === 1 ? '' : 's'} imported.`);
     } catch {
       showFeedback('Failed to import expenses.', 'error');

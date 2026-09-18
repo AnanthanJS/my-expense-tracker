@@ -79,7 +79,7 @@ const AboutScreen: React.FC = () => {
       return;
     }
     try {
-      await exportExpensesAsJson(expenses, recurringExpenses);
+      await exportExpensesAsJson(expenses, recurringExpenses, settings);
       // Recorded only after the share sheet resolves, so a cancelled export
       // does not leave a backup date that never happened.
       updateSettings({ ...settings, lastBackupAt: new Date().toISOString() });
