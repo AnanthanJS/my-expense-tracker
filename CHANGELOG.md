@@ -1,3 +1,17 @@
+## [1.3.0](https://github.com/AnanthanJS/my-expense-tracker/compare/v1.2.0...v1.3.0) (2026-09-18)
+
+### Features
+
+* **analytics:** open a category to see the expenses behind it ([2a1b5a8](https://github.com/AnanthanJS/my-expense-tracker/commit/2a1b5a8c64874988200f3dbf88841d463c627cd8))
+* **recurring:** repeat toggle on the expense form ([f61fcf6](https://github.com/AnanthanJS/my-expense-tracker/commit/f61fcf63be5e90ce352fd89b48adf1f79a167e02))
+* **recurring:** start a bill from an expense already logged ([dada8f4](https://github.com/AnanthanJS/my-expense-tracker/commit/dada8f4a011ea7068d7005dfd5a4878a523e7ce3))
+* **ui:** top-anchored toasts and a motion system ([d2b6e6b](https://github.com/AnanthanJS/my-expense-tracker/commit/d2b6e6b7d689a953c7c8dde2b0ce2626d287e9bf))
+
+### Bug Fixes
+
+* **about:** privacy callout rendered as a grey slab on Android ([b02d18d](https://github.com/AnanthanJS/my-expense-tracker/commit/b02d18d511190e27c89d823ecc152f53cff50948))
+* **backup:** carry categories and settings through export and import ([4cec6b1](https://github.com/AnanthanJS/my-expense-tracker/commit/4cec6b1e2bcd329c06f9b86634f40905b0753520))
+
 ## [1.2.0](https://github.com/AnanthanJS/my-expense-tracker/compare/v1.1.0...v1.2.0) (2026-09-17)
 
 ### Features
