@@ -1,3 +1,22 @@
+## [1.2.0](https://github.com/AnanthanJS/my-expense-tracker/compare/v1.1.0...v1.2.0) (2026-09-17)
+
+### Features
+
+* **about:** rebuild About to the new design ([f847a84](https://github.com/AnanthanJS/my-expense-tracker/commit/f847a844166fee8306cc2077f88a9032bbaab6c7))
+* **analytics:** rebuild Analytics to the new design ([ff4b887](https://github.com/AnanthanJS/my-expense-tracker/commit/ff4b887bf1c5afdbad1fd7a324d39a409a9e8908))
+* **assets:** new app icon and splash, generated from a vector source ([84a5019](https://github.com/AnanthanJS/my-expense-tracker/commit/84a50195b3a06f4f95bbcd984421a900ae9a09e8)), closes [#000000](https://github.com/AnanthanJS/my-expense-tracker/issues/000000) [#f8fafc](https://github.com/AnanthanJS/my-expense-tracker/issues/f8fafc)
+* **home:** rebuild Home to the new design ([c6d975c](https://github.com/AnanthanJS/my-expense-tracker/commit/c6d975cc97f506f79b000549d19d813380ed8515))
+* **ui:** design-system overhaul, Sora+Inter typography, Settings redesign ([d062e5a](https://github.com/AnanthanJS/my-expense-tracker/commit/d062e5a36b6c34728f6eb9bf0ff5a4269c697728))
+* **ui:** phase 0 foundations for the Home/Analytics/About redesign ([99ee892](https://github.com/AnanthanJS/my-expense-tracker/commit/99ee892d491ac6738d2f8ac502c9d15bcee8ba24))
+
+### Bug Fixes
+
+* **about:** strengthen the privacy card icon tile ([9f83eaf](https://github.com/AnanthanJS/my-expense-tracker/commit/9f83eaffae33c1fb2354add6e4ac617dcd9de7e8))
+* **analytics:** rendering issues found verifying phase 2 ([c19aa27](https://github.com/AnanthanJS/my-expense-tracker/commit/c19aa27d2537c6919549186b351f8f9d4ce30e0d)), closes [#141414](https://github.com/AnanthanJS/my-expense-tracker/issues/141414) [#0e0e0e](https://github.com/AnanthanJS/my-expense-tracker/issues/0e0e0e)
+* **home:** alignment and spacing corrections from a layout audit ([7a641d5](https://github.com/AnanthanJS/my-expense-tracker/commit/7a641d550443cca78731b88cb673404cc5b8f664))
+* **nav:** centre the active tab highlight ([4129201](https://github.com/AnanthanJS/my-expense-tracker/commit/4129201d09c5ca9dbe7753e96504d02a6ff7d1e5))
+* **theme:** callout cards inverted in dark mode ([7b1ea17](https://github.com/AnanthanJS/my-expense-tracker/commit/7b1ea17a066900dacf0bdc1d2929761a8408f805)), closes [#060a0f](https://github.com/AnanthanJS/my-expense-tracker/issues/060a0f) [#0e0e0e](https://github.com/AnanthanJS/my-expense-tracker/issues/0e0e0e)
+
 ## [1.1.0](https://github.com/AnanthanJS/my-expense-tracker/compare/v1.0.0...v1.1.0) (2026-09-17)
 
 ### Features
